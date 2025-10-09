@@ -11,7 +11,7 @@ plan proxtoboltfu::puppet_access_login {
 
   # Run puppet access login locally with server-specific token file
   $result = run_command(
-    "echo '${console_password}' | puppet access login --username admin --lifetime 10y --config-file ${token_file}",
+    "echo '${console_password}' | puppet access login --username admin --lifetime 10y --token-file ${token_file}",
     'localhost',
     '_run_as' => system::env('USER')
   )

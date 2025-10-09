@@ -21,11 +21,10 @@ The architecture separates infrastructure provisioning (OpenTofu) from configura
 
 ### Required Tools
 
-- **OpenTofu** >= 1.10.0 (or Terraform)
-- **Puppet Bolt** >= 3.0
-- **Puppet Enterprise** installer (downloaded separately)
-- **eyaml** gem for encrypted hiera data
-- **Git** for version control
+- OpenTofu >= 1.10.0 (or Terraform)
+- [Puppet Bolt](https://help.puppet.com/bolt/current/topics/bolt_installing.htm) >= 3.0
+- Puppet Enterprise installer (downloaded separately)
+- Git for version control
 
 Install tools:
 ```bash
@@ -40,13 +39,7 @@ gem install hiera-eyaml
 
 - **Proxmox VE** cluster with API access
 - **Pihole** DNS server with API access
-- **VM templates** in Proxmox:
-  - `template-Ubuntu-2404` (for PE server)
-  - `template-Ubuntu-2204` (for SCM/CD4PE)
-- **Network** with VLAN 7, gateway 192.168.7.1
-- **IP range** available: 192.168.7.100-102 (expandable)
 - **SSH access** to Proxmox hosts
-- **ed25519 SSH key** at `~/.ssh/id_ed25519`
 
 ### Required Access
 
