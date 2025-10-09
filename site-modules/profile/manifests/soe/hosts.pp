@@ -17,7 +17,7 @@ class profile::soe::hosts {
   @@host { $facts['networking']['hostname']:
     ensure       => present,
     host_aliases => [$facts['networking']['fqdn']],
-    ip           => $primary_ip,
+    ip           => $facts['networking']['ip'],
     tag          => $facts['networking']['domain'],
   }
 
