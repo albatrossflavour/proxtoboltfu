@@ -102,6 +102,9 @@ plan proxtoboltfu::build_pe {
   # Download CA certificate
   run_plan('proxtoboltfu::fetch_ca_cert')
 
+  # Generate PE access token
+  run_plan('proxtoboltfu::puppet_access_login')
+
   out::message("Puppet Enterprise build completed successfully")
 
   return { status => 'completed' }
