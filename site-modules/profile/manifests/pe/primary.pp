@@ -5,5 +5,6 @@
 #
 # Sets up the firewall, backups and puppet strings
 class profile::pe::primary {
+  include profile::pe::autosign
   include profile::pe::agent_types
 }
