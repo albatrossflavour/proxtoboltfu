@@ -47,7 +47,7 @@ plan proxtoboltfu::build_pe {
   out::message("Installing eyaml encryption keys...")
 
   # Read public key content
-  $public_key_content = file::read("${system::env('HOME')}/.eyaml/public_key.pkcs7.pem")
+  $public_key_content = file::read("keys/public_key.pkcs7.pem")
   run_task('peadm::mkdir_p_file', $targets,
     'content' => $public_key_content,
     'path' => '/etc/puppetlabs/secure/keys/public_key.pkcs7.pem',
@@ -58,7 +58,7 @@ plan proxtoboltfu::build_pe {
   )
 
   # Read private key content
-  $private_key_content = file::read("${system::env('HOME')}/.eyaml/private_key.pkcs7.pem")
+  $private_key_content = file::read("keys/private_key.pkcs7.pem")
   run_task('peadm::mkdir_p_file', $targets,
     'content' => $private_key_content,
     'path' => '/etc/puppetlabs/secure/keys/private_key.pkcs7.pem',
