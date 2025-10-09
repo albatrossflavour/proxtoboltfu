@@ -1,0 +1,62 @@
+# Terraboltmox Unified .gitignore
+
+## Terraform
+tf/terraform-plugin-proxmox.log
+tf/.terraform
+tf/.terraform.lock.hcl
+tf/terraform.tfstate.backup
+tf/terraform.tfstate
+tf/terraform.tfvars
+tf/s3.tfbackend
+
+## Configuration (keep sensitive configs private)
+config/params.json
+config/*.tfvars
+config/environments/*.yaml
+*-
+
+## Bolt
+bolt-debug.log
+.plan_cache.json
+.task_cache.json
+
+## Puppet/Ruby Development
+.git/
+.*.sw[op]
+.metadata
+.yardoc
+.yardwarns
+*.iml
+/.bundle/
+/.idea/
+/.vagrant/
+/coverage/
+/bin/
+/doc/
+/Gemfile.local
+/Gemfile.lock
+/junit/
+/log/
+/pkg/
+/spec/fixtures/manifests/
+/spec/fixtures/modules/
+/tmp/
+/vendor/
+/convert_report.txt
+/update_report.txt
+
+## System Files
+.DS_Store
+
+## Claude Code
+.claude
+
+## Environment Variables
+.envrc
+
+## PEAdm Components (keep at root but ignore sensitive data)
+.modules/
+.resource_types/
+downloads/
+keys/
+.rerun.json

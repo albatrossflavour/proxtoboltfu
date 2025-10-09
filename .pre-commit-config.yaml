@@ -1,0 +1,66 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-symlinks
+      - id: detect-private-key
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.17.2
+    hooks:
+      - id: yamlfmt
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.12.0-2
+    hooks:
+      - id: shfmt
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        # args: ["--external-sources"]  # uncomment if needed
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.45.0
+    hooks:
+      - id: markdownlint
+        exclude: '(CLAUDE\.md|README\.md|CONTRIBUTING\.md)$'
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.100.0
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_validate
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        additional_dependencies:
+          - prettier@3.3.3
+        files: '\.(js|jsx|ts|tsx|json|css|scss|md|yaml|yml|html)$'
+        exclude: 'CLAUDE\.md$'
+  - repo: local
+    hooks:
+      - id: validate-templates-csv
+        name: Validate templates.csv format
+        entry: bash
+        args:
+          [
+            -c,
+            'awk -F, "NF != 4 {print \"Line \" NR \": incorrect number of columns\"; exit 1}" config/templates.csv',
+          ]
+        language: system
+        files: config/templates\.csv$
+      - id: check-vm-id-conflicts
+        name: Check for VM ID conflicts in Terraform
+        entry: bash
+        args:
+          [
+            -c,
+            'if grep -o "vmid.*=.*[0-9]" tf/*.tf | sort | uniq -d | grep -q .; then echo "Duplicate VM IDs found"; exit 1; fi',
+          ]
+        language: system
+        files: \.tf$

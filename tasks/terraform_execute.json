@@ -1,0 +1,26 @@
+{
+  "description": "Execute Terraform operations with secret injection",
+  "parameters": {
+    "terraform_dir": {
+      "description": "Directory containing Terraform configuration",
+      "type": "String"
+    },
+    "action": {
+      "description": "Terraform action to execute (plan, apply, destroy)",
+      "type": "Enum[plan, apply, destroy]"
+    },
+    "args": {
+      "description": "Additional arguments to pass to Terraform",
+      "type": "Optional[Array[String]]"
+    },
+    "secrets": {
+      "description": "Environment variables to set from 1Password",
+      "type": "Optional[Hash]"
+    }
+  },
+  "implementations": [
+    {
+      "name": "terraform_execute.rb"
+    }
+  ]
+}

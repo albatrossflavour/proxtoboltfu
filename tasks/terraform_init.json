@@ -1,0 +1,14 @@
+{
+  "description": "Initialize Terraform with backend configuration",
+  "parameters": {
+    "terraform_dir": {
+      "description": "Directory containing Terraform configuration",
+      "type": "String"
+    }
+  },
+  "implementations": [
+    {
+      "name": "terraform_init.sh"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Get VMs from OpenTofu/Terraform state for inventory",
+  "parameters": {
+    "dir": {
+      "description": "Path to Terraform/OpenTofu project directory",
+      "type": "Optional[String]"
+    },
+    "tag_filter": {
+      "description": "Filter by tag (e.g., 'puppetinfra', 'puppet', 'scm', 'cd4pe', 'puppetagents')",
+      "type": "Optional[String]"
+    }
+  },
+  "input_method": "environment"
+}

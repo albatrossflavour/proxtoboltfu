@@ -1,0 +1,79 @@
+resource "proxmox_vm_qemu" "new-puppet-server" {
+  count                  = var.puppet_pe ? 1 : 0
+  vmid                   = "999"
+  target_nodes           = ["stolat"]
+  tags                   = "puppetinfra;puppet;prod;ubuntu"
+  description            = "Puppet primary server"
+  onboot                 = true
+  #hastate                = "started"
+  agent                  = 1
+  qemu_os                = "l26"
+  agent_timeout          = 600
+  clone                  = "template-Ubuntu-2404"
+  full_clone             = false
+  define_connection_info = false
+  os_type                = "cloud-init"
+  pool                   = "Puppet"
+  cpu {
+    type    = "host"
+    cores   = 4
+    sockets = 3
+    numa    = false
+  }
+  memory     = 16384
+  name       = "new-puppet.${var.domain}"
+  #protection = true
+  bootdisk   = "scsi0"
+  scsihw     = "virtio-scsi-single"
+  ipconfig0  = "ip=192.168.7.100/24,gw=192.168.7.1"
+  ciuser     = var.ciuser
+  cipassword = var.cipassword
+  sshkeys    = var.sshkey
+
+  network {
+    id     = 0
+    bridge = "vmbr1"
+    model  = "virtio"
+    tag    = 7
+  }
+
+  disks {
+    scsi {
+      scsi0 {
+        disk {
+          storage    = "ceph"
+          size       = 100
+          asyncio    = "threads"
+          cache      = "writeback"
+          discard    = true
+          emulatessd = true
+          iothread   = true
+
+        }
+      }
+    }
+    ide {
+      ide2 {
+        cloudinit {
+          storage = "ceph"
+        }
+      }
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      clone,
+      clone_wait,
+      full_clone,
+      target_nodes,
+      pool
+    ]
+  }
+}
+
+resource "pihole_dns_record" "new-puppet" {
+  count  = var.puppet_pe ? 1 : 0
+  domain = "new-puppet.${var.domain}"
+  ip     = regexall("ip=([^/]+)", proxmox_vm_qemu.new-puppet-server[0].ipconfig0)[0][0]
+}
