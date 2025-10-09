@@ -29,6 +29,7 @@ plan proxtoboltfu::build_pe {
     'targets' => $targets
   )
 
+  # Actually do the install
   run_plan('peadm::install', $params)
 
   # Install PE license file as suite-license.lic
@@ -39,9 +40,7 @@ plan proxtoboltfu::build_pe {
     run_task('peadm::mkdir_p_file', $targets,
       'content' => $license_content,
       'path' => '/etc/puppetlabs/suite-license.lic',
-      'owner' => 'pe-puppet',
       'mode' => '0644',
-      'group' => 'pe-puppet'
     )
   } else {
     out::message("Warning: No pe_license_content found in hiera")
