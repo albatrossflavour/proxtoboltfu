@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="images/proxtoboltfu.svg" alt="proxtoboltfu logo" width="400">
+</p>
+
 # proxtoboltfu - Puppet Infrastructure Automation
 
 Automated provisioning and configuration of Puppet Enterprise infrastructure on Proxmox using OpenTofu and Puppet Bolt.

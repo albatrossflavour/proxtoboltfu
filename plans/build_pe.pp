@@ -38,7 +38,7 @@ plan proxtoboltfu::build_pe {
   if $license_content {
     run_task('peadm::mkdir_p_file', $targets,
       'content' => $license_content,
-      'path' => '/etc/puppetlabs/license/suite-license.lic',
+      'path' => '/etc/puppetlabs/suite-license.lic',
       'owner' => 'pe-puppet',
       'mode' => '0644',
       'group' => 'pe-puppet'
@@ -98,6 +98,9 @@ plan proxtoboltfu::build_pe {
     'name' => 'puppet',
     'action' => 'start'
   )
+
+  # Download CA certificate
+  run_plan('proxtoboltfu::fetch_ca_cert')
 
   out::message("Puppet Enterprise build completed successfully")
 
