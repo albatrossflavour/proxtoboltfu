@@ -54,7 +54,7 @@ plan proxtoboltfu::build_cd4pe {
 
   # Install CD4PE using cd4peadm module
   out::message("Installing CD4PE...")
-  run_plan('cd4peadm::install')
+  run_plan('cd4peadm::install_from_config')
 
   # Run Puppet twice to ensure configuration converges
   out::message("Running Puppet agent to apply configuration...")

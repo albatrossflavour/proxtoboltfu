@@ -9,7 +9,7 @@ resource "proxmox_vm_qemu" "new-cd4pe-server" {
   agent                  = 1
   qemu_os                = "l26"
   agent_timeout          = 600
-  clone                  = "template-Ubuntu-2404"
+  clone                  = "template-Ubuntu-2204"
   full_clone             = false
   define_connection_info = false
   os_type                = "cloud-init"
