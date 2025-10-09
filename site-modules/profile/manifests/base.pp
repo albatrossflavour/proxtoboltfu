@@ -6,5 +6,6 @@
 #    include profile::base
 #
 class profile::base {
+  contain profile::soe::hosts
   contain profile::soe::cis
 }
