@@ -31,6 +31,22 @@ plan proxtoboltfu::build_pe {
 
   run_plan('peadm::install', $params)
 
+  # Install PE license file as suite-license.lic
+  out::message("Installing Puppet Enterprise license (suite-license.lic)...")
+  $license_content = lookup('pe_license_content', String, first, undef)
+
+  if $license_content {
+    run_task('peadm::mkdir_p_file', $targets,
+      'content' => $license_content,
+      'path' => '/etc/puppetlabs/license/suite-license.lic',
+      'owner' => 'pe-puppet',
+      'mode' => '0644',
+      'group' => 'pe-puppet'
+    )
+  } else {
+    out::message("Warning: No pe_license_content found in hiera")
+  }
+
   # Deploy code to production environment
   out::message("Deploying code to production environment...")
   run_task('peadm::code_manager', $targets,
@@ -46,8 +62,9 @@ plan proxtoboltfu::build_pe {
   # Install eyaml keys for encrypted data
   out::message("Installing eyaml encryption keys...")
 
-  # Read public key content
-  $public_key_content = file::read("keys/public_key.pkcs7.pem")
+  # Read public key content from project directory
+  $project_dir = system::env('PWD')
+  $public_key_content = file::read("${project_dir}/keys/public_key.pkcs7.pem")
   run_task('peadm::mkdir_p_file', $targets,
     'content' => $public_key_content,
     'path' => '/etc/puppetlabs/secure/keys/public_key.pkcs7.pem',
@@ -58,7 +75,7 @@ plan proxtoboltfu::build_pe {
   )
 
   # Read private key content
-  $private_key_content = file::read("keys/private_key.pkcs7.pem")
+  $private_key_content = file::read("${project_dir}/keys/private_key.pkcs7.pem")
   run_task('peadm::mkdir_p_file', $targets,
     'content' => $private_key_content,
     'path' => '/etc/puppetlabs/secure/keys/private_key.pkcs7.pem',
