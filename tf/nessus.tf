@@ -1,15 +1,15 @@
-resource "proxmox_vm_qemu" "new-cd4pe-server" {
-  count                  = var.puppet_cd4pe ? 1 : 0
-  vmid                   = "997"
+resource "proxmox_vm_qemu" "nessus-server" {
+  count                  = var.nessus ? 1 : 0
+  vmid                   = "995"
   target_nodes           = ["ankh", "morpork"]
-  tags                   = "puppetinfra;cd4pe;prod;ubuntu"
-  description            = "Puppet CD4PE server"
+  tags                   = "puppetinfra;nessus;prod;ubuntu"
+  description            = "Nessus security scanner server"
   onboot                 = true
   #hastate                = "started"
   agent                  = 1
   qemu_os                = "l26"
   agent_timeout          = 600
-  clone                  = "template-Ubuntu-2204"
+  clone                  = "template-Ubuntu-2404"
   full_clone             = false
   define_connection_info = false
   os_type                = "cloud-init"
@@ -20,12 +20,12 @@ resource "proxmox_vm_qemu" "new-cd4pe-server" {
     sockets = 2
     numa    = false
   }
-  memory     = 8192
-  name       = "new-cd4pe.${var.domain}"
+  memory     = 4096
+  name       = "new-nessus.${var.domain}"
   #protection = true
   bootdisk   = "scsi0"
   scsihw     = "virtio-scsi-single"
-  ipconfig0  = "ip=192.168.10.102/24,gw=192.168.10.1"
+  ipconfig0  = "ip=192.168.10.104/24,gw=192.168.10.1"
   nameserver = "192.168.9.2 192.168.9.3"
   ciuser     = var.ciuser
   cipassword = var.cipassword
@@ -62,8 +62,6 @@ resource "proxmox_vm_qemu" "new-cd4pe-server" {
     }
   }
 
-  depends_on = [proxmox_vm_qemu.new-puppet-server[0]]
-
   lifecycle {
     ignore_changes = [
       clone,
@@ -75,8 +73,8 @@ resource "proxmox_vm_qemu" "new-cd4pe-server" {
   }
 }
 
-resource "pihole_dns_record" "new-cd4pe" {
-  count  = var.puppet_cd4pe ? 1 : 0
-  domain = "new-cd4pe.${var.domain}"
-  ip     = regexall("ip=([^/]+)", proxmox_vm_qemu.new-cd4pe-server[0].ipconfig0)[0][0]
+resource "pihole_dns_record" "new-nessus" {
+  count  = var.nessus ? 1 : 0
+  domain = "new-nessus.${var.domain}"
+  ip     = regexall("ip=([^/]+)", proxmox_vm_qemu.nessus-server[0].ipconfig0)[0][0]
 }

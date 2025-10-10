@@ -330,3 +330,27 @@ The loop is closed: Terraform → State → Inventory → Plans → Hiera → Te
 - **Test** tag filters before deploying: `PT_tag_filter=<tag> ./tasks/tofu_inventory.sh`
 - **Extend** via tags, not by modifying inventory task
 - Terraform and Bolt are **decoupled** - run independently
+
+## Working Principles
+
+### Problem Solving Approach
+
+**NEVER suggest workarounds before diagnosis:**
+- ❌ "Just run it again" - for Puppet, Tofu/Terraform, or any tool
+- ❌ Adding retries, dependencies, or parallelism limits without understanding the root cause
+- ❌ Removing functionality to avoid dealing with issues
+
+**ALWAYS diagnose first, then fix properly:**
+- ✅ Check logs first - application logs, system logs, API logs
+- ✅ Investigate errors and system behaviour
+- ✅ Identify the actual constraint or bottleneck
+- ✅ Address the root cause with proper configuration
+- ✅ Performance tuning over artificial limitations
+
+**Example - Pihole API Session Exhaustion:**
+- ❌ Wrong: Remove Pihole from Terraform entirely, switch to Route53/PowerDNS, manage DNS separately
+- 🔍 Diagnostic steps: Add `depends_on` to test serialization, use `-parallelism=1` to eliminate concurrency
+- ✅ Right: Increase `webserver.api.max_sessions` in `/etc/pihole/pihole.toml` from 16 to 64 to accommodate session leaks in the provider
+
+**Principle: Right first time**
+If it requires multiple runs, retries, or manual intervention to succeed, it's not right. Fix the underlying issue.

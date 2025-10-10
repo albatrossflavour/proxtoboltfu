@@ -25,7 +25,8 @@ resource "proxmox_vm_qemu" "new-scm-server" {
   #protection = true
   bootdisk   = "scsi0"
   scsihw     = "virtio-scsi-single"
-  ipconfig0  = "ip=192.168.7.101/24,gw=192.168.7.1,nameserver=192.168.9.2 192.168.9.3"
+  ipconfig0  = "ip=192.168.10.101/24,gw=192.168.10.1"
+  nameserver = "192.168.9.2 192.168.9.3"
   ciuser     = var.ciuser
   cipassword = var.cipassword
   sshkeys    = var.sshkey
@@ -34,7 +35,7 @@ resource "proxmox_vm_qemu" "new-scm-server" {
     id     = 0
     bridge = "vmbr1"
     model  = "virtio"
-    tag    = 7
+    tag    = 6
   }
 
   disks {

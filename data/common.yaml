@@ -247,3 +247,16 @@ cd4peadm::config:
     OaDMepTkl90DX1wsAsHXM+itt50I6R214rg0u+YjxrML9HggneuK1sYNC70u 4Q79hoM4q7bmM6mejPsNywnotxtxgpjKJzQjIEyB+k4oIQkgSWFBz3dpbaiz
     KPuI8WJpKhJ3qNX9twAJ2IQOSPmGVwQ1UU7jP3HvAR/pEc8CL1ckBU/uVGqK +2CL8cS71W8tCB8kCaeoEGo=]
   java_args: "-Xmx1024M -Xms1024M"
+dashboard::config:
+  resolvable_hostname: new-dashboard.albatrossflavour.com
+dashboard::csr_attributes:
+  datacenter: lab
+  role: role::dashboard
+  environment: production
+dashboard::grafana_admin_password: ENC[PKCS7,MIIBeQYJKoZIhvcNAQcDoIIBajCCAWYCAQAxggEhMIIBHQIBADAFMAACAQEwDQYJKoZIhvcNAQEBBQAEggEAkCHFMgxik4YuZE9Y+CR5TesMnGGIdtECw1/5JeuOju0shRfwUvq4yiWa9l4Vd9MGeEpsjxcwPbj1Gt2WfIS33ioaEMS2uL8i0+xkc2poL3WglSUwaTRtUPGMoLolMLppSfIMP4Drtx8tmXUu89TE4/cygDJpzpjPztzAvmogDdnAV23TIm0p1ZEJab/oeQhVbmM+U6E+j8SQRaSCctJ4NQALNn4r6SxPwlqZhQigeQvaij1mkDtQuerXWmTYHKm//tEMacPw+Nkk0HFiqdV5AGjZTyZKqkAfyLvks8I103Ttb8Pu7+6E9q50qZcPqU0nv4I7v7e3dOkuKxVZfX/MWTA8BgkqhkiG9w0BBwEwHQYJYIZIAWUDBAEqBBBYPEB5vr2kNOs9bU3OfOg0gBBoL8t/rBR5V1WvdKZdbq/p]
+nessus::config:
+  resolvable_hostname: new-nessus.albatrossflavour.com
+nessus::csr_attributes:
+  datacenter: lab
+  role: role::nessus
+  environment: production

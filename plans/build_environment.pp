@@ -33,32 +33,45 @@ plan proxtoboltfu::build_environment (
   # Step 2: Build Puppet Enterprise
   out::message("Step 2: Building Puppet Enterprise...")
   run_plan('proxtoboltfu::build_pe')
-  out::message("✓ Puppet Enterprise build complete")
+  out::message("✓ Puppet Enterprise build complete (includes CA cert and console login)")
   out::message("")
 
-  # Step 3: Fetch CA certificate from PE server
-  out::message("Step 3: Fetching CA certificate...")
-  run_plan('proxtoboltfu::fetch_ca_cert')
-  out::message("✓ CA certificate downloaded")
-  out::message("")
+  # Step 3: Build additional infrastructure servers
+  out::message("Step 3: Building additional infrastructure servers...")
 
-  # Step 4: Login to PE console
-  out::message("Step 4: Logging into Puppet Enterprise console...")
-  run_plan('proxtoboltfu::puppet_access_login')
-  out::message("✓ Console login complete")
-  out::message("")
+  # Get fresh inventory from tofu state (inventory is cached from plan start)
+  $scm_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
+    'dir' => 'tf',
+    'tag_filter' => 'scm'
+  )
+  $cd4pe_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
+    'dir' => 'tf',
+    'tag_filter' => 'cd4pe'
+  )
+  $dashboard_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
+    'dir' => 'tf',
+    'tag_filter' => 'dashboard'
+  )
+  $nessus_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
+    'dir' => 'tf',
+    'tag_filter' => 'nessus'
+  )
 
-  # Step 5: Build SCM and CD4PE
-  out::message("Step 5: Building SCM and CD4PE servers...")
+  $scm_data = $scm_inventory.first.value['value']
+  $cd4pe_data = $cd4pe_inventory.first.value['value']
+  $dashboard_data = $dashboard_inventory.first.value['value']
+  $nessus_data = $nessus_inventory.first.value['value']
 
-  # Check if SCM and CD4PE targets exist in inventory
-  $scm_targets = get_targets('scm-nodes')
-  $cd4pe_targets = get_targets('cd4pe-nodes')
+  # Create Target objects from fresh inventory
+  $scm_targets = $scm_data.map |$t| { Target.new($t['name'], $t['uri']) }
+  $cd4pe_targets = $cd4pe_data.map |$t| { Target.new($t['name'], $t['uri']) }
+  $dashboard_targets = $dashboard_data.map |$t| { Target.new($t['name'], $t['uri']) }
+  $nessus_targets = $nessus_data.map |$t| { Target.new($t['name'], $t['uri']) }
 
-  if $scm_targets.empty and $cd4pe_targets.empty {
-    out::message("⚠ No SCM or CD4PE targets found in inventory, skipping")
+  if $scm_targets.empty and $cd4pe_targets.empty and $dashboard_targets.empty and $nessus_targets.empty {
+    out::message("⚠ No additional infrastructure servers found in tofu state, skipping")
   } else {
-    # Build both in parallel using background jobs
+    # Build all in parallel using background jobs
     $scm_job = background() || {
       if !$scm_targets.empty {
         out::message("  Building SCM server...")
@@ -75,19 +88,43 @@ plan proxtoboltfu::build_environment (
       }
     }
 
-    # Wait for both to complete
-    wait($scm_job, $cd4pe_job)
-    out::message("✓ SCM and CD4PE builds complete")
+    $dashboard_job = background() || {
+      if !$dashboard_targets.empty {
+        out::message("  Building Dashboard server...")
+        run_plan('proxtoboltfu::build_dashboard')
+        out::message("  ✓ Dashboard build complete")
+      }
+    }
+
+    $nessus_job = background() || {
+      if !$nessus_targets.empty {
+        out::message("  Building Nessus server...")
+        run_plan('proxtoboltfu::build_nessus')
+        out::message("  ✓ Nessus build complete")
+      }
+    }
+
+    # Wait for all to complete
+    wait([$scm_job, $cd4pe_job, $dashboard_job, $nessus_job])
+    out::message("✓ Additional infrastructure servers build complete")
   }
 
   out::message("")
 
-  # Step 6: Provision agents if any exist
-  out::message("Step 6: Checking for agent nodes...")
-  $agent_targets = get_targets('puppet-agents')
+  # Step 4: Provision agents if any exist
+  out::message("Step 4: Checking for agent nodes...")
+
+  # Get fresh inventory from tofu state
+  $agent_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
+    'dir' => 'tf',
+    'tag_filter' => 'puppetagents'
+  )
+
+  $agent_data = $agent_inventory.first.value['value']
+  $agent_targets = $agent_data.map |$t| { Target.new($t['name'], $t['uri']) }
 
   if $agent_targets.empty {
-    out::message("⚠ No agent nodes found in inventory, skipping agent provisioning")
+    out::message("⚠ No agent nodes found in tofu state, skipping agent provisioning")
   } else {
     out::message("Found ${agent_targets.length} agent node(s), provisioning...")
     # TODO: Add agent provisioning plan when created
@@ -100,11 +137,9 @@ plan proxtoboltfu::build_environment (
   out::message("")
   out::message("Summary:")
   out::message("  ✓ Infrastructure provisioned")
-  out::message("  ✓ Puppet Enterprise installed and configured")
-  out::message("  ✓ CA certificate downloaded")
-  out::message("  ✓ Console access configured")
-  if !$scm_targets.empty or !$cd4pe_targets.empty {
-    out::message("  ✓ SCM/CD4PE servers configured")
+  out::message("  ✓ Puppet Enterprise installed and configured (with CA cert and console access)")
+  if !$scm_targets.empty or !$cd4pe_targets.empty or !$dashboard_targets.empty or !$nessus_targets.empty {
+    out::message("  ✓ Additional infrastructure servers configured")
   }
   if !$agent_targets.empty {
     out::message("  ⚠ Agent nodes detected but provisioning not implemented")
@@ -112,7 +147,10 @@ plan proxtoboltfu::build_environment (
 
   return {
     status => 'completed',
-    infrastructure_count => get_targets('puppet-infrastructure').length,
+    scm_count => $scm_targets.length,
+    cd4pe_count => $cd4pe_targets.length,
+    dashboard_count => $dashboard_targets.length,
+    nessus_count => $nessus_targets.length,
     agent_count => $agent_targets.length
   }
 }
