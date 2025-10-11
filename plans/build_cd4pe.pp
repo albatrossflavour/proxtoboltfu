@@ -24,6 +24,17 @@ plan proxtoboltfu::build_cd4pe {
   out::message("Puppet Server: ${puppet_server}")
   out::message("")
 
+  # Check if Puppet is already installed
+  out::message("Checking if Puppet is already installed...")
+  $check_puppet = run_command('test -f /usr/local/bin/puppet', $targets, '_catch_errors' => true)
+
+  if $check_puppet.ok {
+    out::message("✓ Puppet already installed on ${targets}, skipping installation")
+    return { status => 'already_installed' }
+  }
+
+  out::message("Puppet not found, proceeding with installation...")
+
   # Insert CSR extension requests for CD4PE classification
   out::message("Setting up CSR extension requests...")
 
@@ -52,8 +63,8 @@ plan proxtoboltfu::build_cd4pe {
   out::message("Running Puppet agent to register with master...")
   run_task('peadm::puppet_runonce', $targets)
 
-  # Install CD4PE using cd4peadm module
-  out::message("Installing CD4PE...")
+  # Install CD4PE using cd4peadm module from existing hiera config
+  out::message("Installing CD4PE from config (data/cd4pe.yaml)")
   run_plan('cd4peadm::install_from_config')
 
   # Run Puppet twice to ensure configuration converges

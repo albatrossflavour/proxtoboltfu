@@ -7,7 +7,7 @@ plan proxtoboltfu::build_environment (
   out::message("=== proxtoboltfu Environment Build ===")
   out::message("")
 
-  # Step 1: Apply Terraform to provision infrastructure
+  # Step 1: Apply OpenTofu to provision infrastructure
   if $apply_terraform {
     out::message("Step 1: Provisioning infrastructure with OpenTofu...")
     $tofu_result = run_command(
@@ -111,8 +111,8 @@ plan proxtoboltfu::build_environment (
 
   out::message("")
 
-  # Step 4: Provision agents if any exist
-  out::message("Step 4: Checking for agent nodes...")
+  # Step 4: Build agents if any exist
+  out::message("Step 4: Building agent nodes...")
 
   # Get fresh inventory from tofu state
   $agent_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
@@ -124,12 +124,11 @@ plan proxtoboltfu::build_environment (
   $agent_targets = $agent_data.map |$t| { Target.new($t['name'], $t['uri']) }
 
   if $agent_targets.empty {
-    out::message("⚠ No agent nodes found in tofu state, skipping agent provisioning")
+    out::message("⚠ No agent nodes found in tofu state, skipping")
   } else {
-    out::message("Found ${agent_targets.length} agent node(s), provisioning...")
-    # TODO: Add agent provisioning plan when created
-    # run_plan('proxtoboltfu::provision_agents')
-    out::message("⚠ Agent provisioning plan not yet implemented")
+    out::message("Found ${agent_targets.length} agent node(s), building...")
+    run_plan('proxtoboltfu::build_agents')
+    out::message("✓ Agent build complete")
   }
 
   out::message("")
@@ -142,7 +141,7 @@ plan proxtoboltfu::build_environment (
     out::message("  ✓ Additional infrastructure servers configured")
   }
   if !$agent_targets.empty {
-    out::message("  ⚠ Agent nodes detected but provisioning not implemented")
+    out::message("  ✓ ${agent_targets.length} agent nodes built")
   }
 
   return {

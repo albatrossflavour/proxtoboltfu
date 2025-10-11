@@ -3,7 +3,7 @@
 # @example
 #   include role::pe::dashboard
 #
-class role::pe::metric_dashboard {
+class role::pe::dashboard {
   require profile::base
-  include profile::pe::metric_dashboard
+  include profile::pe::dashboard
 }

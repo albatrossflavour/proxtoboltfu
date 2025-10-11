@@ -16,6 +16,17 @@ plan proxtoboltfu::build_pe {
   out::message("Target: ${targets}")
   out::message("")
 
+  # Check if Puppet is already installed
+  out::message("Checking if Puppet is already installed...")
+  $check_puppet = run_command('test -f /usr/local/bin/puppet', $targets, '_catch_errors' => true)
+
+  if $check_puppet.ok {
+    out::message("✓ Puppet already installed on ${targets}, skipping installation")
+    return { status => 'already_installed' }
+  }
+
+  out::message("Puppet not found, proceeding with installation...")
+
   # Insert CSR extension requests for PE classification
   out::message("Setting up CSR extension requests...")
   $extension_requests = {

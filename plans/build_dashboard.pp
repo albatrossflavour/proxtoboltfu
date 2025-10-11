@@ -7,7 +7,7 @@ plan proxtoboltfu::build_dashboard {
   # Lookup CSR attributes separately
   $csr_attributes = lookup('dashboard::csr_attributes', Hash, first, {
     'datacenter' => 'lab',
-    'role' => 'role::dashboard',
+    'role' => 'role::pe::dashboard',
     'environment' => 'production'
   })
 
@@ -26,6 +26,17 @@ plan proxtoboltfu::build_dashboard {
   out::message("Target: ${targets}")
   out::message("Puppet Server: ${puppet_server}")
   out::message("")
+
+  # Check if Puppet is already installed
+  out::message("Checking if Puppet is already installed...")
+  $check_puppet = run_command('test -f /usr/local/bin/puppet', $targets, '_catch_errors' => true)
+
+  if $check_puppet.ok {
+    out::message("✓ Puppet already installed on ${targets}, skipping installation")
+    return { status => 'already_installed' }
+  }
+
+  out::message("Puppet not found, proceeding with installation...")
 
   # Insert CSR extension requests for Dashboard classification
   out::message("Setting up CSR extension requests")

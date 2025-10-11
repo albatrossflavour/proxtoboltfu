@@ -7,7 +7,7 @@ plan proxtoboltfu::build_nessus {
   # Lookup CSR attributes separately
   $csr_attributes = lookup('nessus::csr_attributes', Hash, first, {
     'datacenter' => 'lab',
-    'role' => 'role::nessus',
+    'role' => 'role::pe::nessus',
     'environment' => 'production'
   })
 
@@ -23,6 +23,17 @@ plan proxtoboltfu::build_nessus {
   out::message("Target: ${targets}")
   out::message("Puppet Server: ${puppet_server}")
   out::message("")
+
+  # Check if Puppet is already installed
+  out::message("Checking if Puppet is already installed...")
+  $check_puppet = run_command('test -f /usr/local/bin/puppet', $targets, '_catch_errors' => true)
+
+  if $check_puppet.ok {
+    out::message("✓ Puppet already installed on ${targets}, skipping installation")
+    return { status => 'already_installed' }
+  }
+
+  out::message("Puppet not found, proceeding with installation...")
 
   # Insert CSR extension requests for Nessus classification
   out::message("Setting up CSR extension requests")

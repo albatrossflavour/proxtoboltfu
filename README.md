@@ -12,6 +12,9 @@ This project provides a complete infrastructure-as-code solution for deploying:
 - **Puppet Enterprise** (PE) server
 - **SCM/Comply** server for compliance management
 - **CD4PE** server for continuous delivery
+- **Dashboard** server for visualization
+- **Nessus** vulnerability scanner
+- **Puppet agent clients** across multiple OS distributions
 - **Dynamic inventory** from Terraform state
 - **Automatic DNS** registration via Pihole
 
@@ -81,9 +84,26 @@ proxmox_token_id     = "terraform@pam!terraform"
 proxmox_token_secret = "your-proxmox-token-secret"
 
 # Infrastructure Toggles
-puppet_pe    = true   # Deploy Puppet Enterprise
-puppet_scm   = true   # Deploy SCM/Comply
-puppet_cd4pe = true   # Deploy CD4PE
+puppet_pe        = true   # Deploy Puppet Enterprise
+puppet_scm       = true   # Deploy SCM/Comply
+puppet_cd4pe     = true   # Deploy CD4PE
+puppet_dashboard = true   # Deploy Dashboard
+nessus           = true   # Deploy Nessus
+
+# OS Distribution Controls
+enable_alma        = false
+enable_centos      = false
+enable_debian      = false
+enable_oracle      = false
+enable_redhat      = false
+enable_rocky       = false
+enable_ubuntu      = true
+enable_opensuse    = false
+enable_amazonlinux = false
+
+# Client Counts
+prod_clients = 1  # Number of clients per OS in production
+dev_clients  = 0  # Number of clients per OS in development
 
 # VM Defaults
 ciuser     = "yourusername"
@@ -190,9 +210,28 @@ bolt module install
 
 ## Deployment
 
-### Full Stack Deployment
+### Full Stack Deployment (Single Command)
 
-Deploy the complete Puppet infrastructure in order:
+```bash
+bolt plan run proxtoboltfu::build_environment
+```
+
+This orchestrates the complete deployment:
+1. Provisions infrastructure with OpenTofu (VMs + DNS)
+2. Builds Puppet Enterprise server
+3. Builds additional infrastructure (SCM, CD4PE, Dashboard, Nessus) in parallel
+4. Builds agent nodes if any exist
+
+**Expected time:** 30-45 minutes
+
+To skip infrastructure provisioning (if VMs already exist):
+```bash
+bolt plan run proxtoboltfu::build_environment apply_terraform=false
+```
+
+### Manual Step-by-Step Deployment
+
+If you prefer manual control:
 
 #### 1. Provision Infrastructure
 
@@ -201,72 +240,61 @@ cd tf
 tofu init
 tofu plan   # Review what will be created
 tofu apply
+cd ..
 ```
 
-This creates:
-- Puppet Enterprise VM (new-puppet.yourdomain.com, 192.168.7.100)
-- SCM VM (new-scm.yourdomain.com, 192.168.7.101)
-- CD4PE VM (new-cd4pe.yourdomain.com, 192.168.7.102)
-- DNS records in Pihole
+This creates VMs and DNS records for enabled infrastructure.
 
 **Expected time:** 2-3 minutes
 
-#### 2. Verify Infrastructure
-
-```bash
-# Return to project root
-cd ..
-
-# Check inventory discovered VMs
-bolt inventory show --targets puppet-infrastructure
-
-# Test connectivity
-bolt command run 'hostname' --targets puppet-infrastructure
-```
-
-Expected output: All three hosts respond with their hostnames.
-
-#### 3. Build Puppet Enterprise
+#### 2. Build Puppet Enterprise
 
 ```bash
 bolt plan run proxtoboltfu::build_pe
 ```
 
-This:
-- Installs Puppet Enterprise
-- Configures primary server
-- Deploys code to environments
-- Installs eyaml keys
+This installs and configures PE, deploys code, and installs eyaml keys.
 
 **Expected time:** 20-30 minutes
 
-#### 4. Build SCM and CD4PE
+#### 3. Build Additional Infrastructure
 
-These can run in parallel or sequentially:
+These can run in parallel:
 
 ```bash
-# Option 1: Run sequentially
 bolt plan run proxtoboltfu::build_scm
 bolt plan run proxtoboltfu::build_cd4pe
-
-# Option 2: Run in parallel (separate terminals)
-bolt plan run proxtoboltfu::build_scm &
-bolt plan run proxtoboltfu::build_cd4pe &
-wait
+bolt plan run proxtoboltfu::build_dashboard
+bolt plan run proxtoboltfu::build_nessus
 ```
 
 **Expected time:** 15-20 minutes each
 
-#### 5. Post-Installation
+#### 4. Build Agent Nodes
 
 ```bash
-# Download CA certificate from PE server
-bolt plan run proxtoboltfu::fetch_ca_cert
-
-# Login to PE console
-bolt plan run proxtoboltfu::puppet_access_login \
-  console_password='your-console-password'
+bolt plan run proxtoboltfu::build_agents
 ```
+
+**Expected time:** Varies by agent count (1-2 minutes per agent)
+
+### Managing Agent Clients
+
+**Deploy Clients:**
+1. Configure client counts in `tf/terraform.tfvars`
+2. Apply infrastructure: `cd tf && tofu apply && cd ..`
+3. Configure agents: `bolt plan run proxtoboltfu::build_agents`
+
+**Destroy Clients:**
+```bash
+# Preview what will be destroyed
+bolt plan run proxtoboltfu::destroy_clients
+
+# Actually destroy (purges from PE, then destroys VMs)
+bolt plan run proxtoboltfu::destroy_clients confirm=true
+```
+
+The destroy process automatically purges agent certificates from Puppet Enterprise before destroying VMs.
 
 ### Verification
 
@@ -294,6 +322,19 @@ open https://new-puppet.yourdomain.com
 | `puppet_pe` | No | false | Deploy Puppet Enterprise |
 | `puppet_scm` | No | false | Deploy SCM/Comply |
 | `puppet_cd4pe` | No | false | Deploy CD4PE |
+| `puppet_dashboard` | No | false | Deploy Dashboard |
+| `nessus` | No | false | Deploy Nessus |
+| `enable_alma` | No | false | Enable Alma Linux clients |
+| `enable_centos` | No | false | Enable CentOS clients |
+| `enable_debian` | No | false | Enable Debian clients |
+| `enable_oracle` | No | false | Enable Oracle Linux clients |
+| `enable_redhat` | No | false | Enable RHEL clients |
+| `enable_rocky` | No | false | Enable Rocky Linux clients |
+| `enable_ubuntu` | No | false | Enable Ubuntu clients |
+| `enable_opensuse` | No | false | Enable OpenSUSE clients |
+| `enable_amazonlinux` | No | false | Enable Amazon Linux clients |
+| `prod_clients` | No | 0 | Number of clients per OS in production |
+| `dev_clients` | No | 0 | Number of clients per OS in development |
 | `ciuser` | Yes | - | Cloud-init default user |
 | `cipassword` | Yes | - | Cloud-init default password |
 | `sshkey` | Yes | - | SSH public key for access |
@@ -329,11 +370,16 @@ See module documentation for additional configuration options:
 
 ### VM Specifications
 
-| Server | VMID | IP | vCPU | RAM | Disk | OS |
-|--------|------|-------|------|-----|------|-----|
-| PE Primary | 999 | 192.168.7.100 | 12 (3x4) | 16GB | 100GB | Ubuntu 24.04 |
-| SCM | 998 | 192.168.7.101 | 8 (2x4) | 8GB | 50GB | Ubuntu 22.04 |
-| CD4PE | 997 | 192.168.7.102 | 8 (2x4) | 8GB | 50GB | Ubuntu 24.04 |
+| Server | VMID | vCPU | RAM | Disk | OS |
+|--------|------|------|-----|------|-----|
+| PE Primary | 999 | 12 (3x4) | 16GB | 100GB | Ubuntu 24.04 |
+| SCM | 998 | 8 (2x4) | 8GB | 50GB | Ubuntu 22.04 |
+| CD4PE | 997 | 8 (2x4) | 8GB | 50GB | Ubuntu 24.04 |
+| Dashboard | 996 | 4 (2x2) | 4GB | 50GB | Ubuntu 22.04 |
+| Nessus | 995 | 4 (2x2) | 4GB | 50GB | Ubuntu 22.04 |
+| Agents | 1xxx-9xxxx | 2 (1x2) | 1.5GB | 37GB | Varies |
+
+Agent VMs are created dynamically based on enabled OS distributions and client counts.
 
 ### Tags
 
@@ -345,23 +391,24 @@ Infrastructure uses tags for dynamic inventory grouping:
 | `puppet` | PE servers | PE-specific operations |
 | `scm` | SCM servers | Compliance tasks |
 | `cd4pe` | CD4PE servers | Pipeline management |
+| `dashboard` | Dashboard servers | Visualization tasks |
+| `nessus` | Nessus scanners | Security scanning |
 | `puppetagents` | Agent nodes | Agent deployment |
-| `prod` | Production | Environment filtering |
-| `ubuntu` | OS type | OS-specific tasks |
 
-Add new tags by editing `tags` in Terraform resources, then create inventory groups.
+Add new tags by editing `tags` in Terraform resources, then create inventory groups in `inventory.yaml`.
 
 ## Management Tasks
 
 ### Add Agent Nodes
 
-1. **Create Terraform resource** in `tf/agents.tf`:
+Agent nodes are managed via `tf/clients.tf` which uses dynamic configuration:
+
+1. **Enable OS distributions** in `tf/terraform.tfvars`:
    ```hcl
-   resource "proxmox_vm_qemu" "puppet-agent" {
-     count = var.prod_clients
-     tags  = "puppetagents;prod;ubuntu"
-     # ... configuration
-   }
+   enable_ubuntu = true
+   enable_rocky  = true
+   prod_clients  = 2
+   dev_clients   = 1
    ```
 
 2. **Apply Terraform:**
@@ -369,17 +416,30 @@ Add new tags by editing `tags` in Terraform resources, then create inventory gro
    cd tf && tofu apply
    ```
 
-3. **Verify inventory:**
+3. **Deploy agents:**
    ```bash
-   bolt inventory show --targets puppet-agents
+   bolt plan run proxtoboltfu::build_agents
    ```
 
-4. **Install agents:**
-   ```bash
-   bolt plan run <your-agent-install-plan> --targets puppet-agents
-   ```
+This creates agents for each enabled OS version in both environments. For example, with the above config:
+- Ubuntu: 20.04, 22.04, 24.04 (3 versions × 3 clients = 9 agents)
+- Rocky: 8, 9 (2 versions × 3 clients = 6 agents)
+- **Total: 15 agents**
 
 ### Destroy Infrastructure
+
+**Destroy Agent Clients Only:**
+```bash
+# Preview what will be destroyed
+bolt plan run proxtoboltfu::destroy_clients
+
+# Confirm and destroy
+bolt plan run proxtoboltfu::destroy_clients confirm=true
+```
+
+This automatically purges certificates from PE before destroying VMs.
+
+**Destroy All Infrastructure:**
 
 **Warning:** This destroys all VMs and data.
 

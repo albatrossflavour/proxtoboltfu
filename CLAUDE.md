@@ -9,15 +9,23 @@ This project uses OpenTofu (Terraform) to provision Proxmox VMs, Pihole for DNS 
 ```text
 proxtoboltfu/
 ├── tf/                           # OpenTofu/Terraform configuration
-│   ├── puppet.tf                 # Puppet Enterprise server (VMID 999, IP .100)
-│   ├── scm.tf                    # SCM/Comply server (VMID 998, IP .101)
-│   ├── cd4pe.tf                  # CD4PE server (VMID 997, IP .102)
+│   ├── puppet.tf                 # Puppet Enterprise server (VMID 999)
+│   ├── scm.tf                    # SCM/Comply server (VMID 998)
+│   ├── cd4pe.tf                  # CD4PE server (VMID 997)
+│   ├── dashboard.tf              # Dashboard server (VMID 996)
+│   ├── nessus.tf                 # Nessus scanner (VMID 995)
+│   ├── clients.tf                # Puppet agent clients (dynamic count)
 │   ├── provider.tf               # Proxmox and Pihole providers
 │   └── variables.tf              # Variable definitions
 ├── plans/                        # Puppet Bolt plans
+│   ├── build_environment.pp      # Orchestrate full stack build
 │   ├── build_pe.pp               # Build Puppet Enterprise server
 │   ├── build_scm.pp              # Build SCM server
 │   ├── build_cd4pe.pp            # Build CD4PE server
+│   ├── build_dashboard.pp        # Build Dashboard server
+│   ├── build_nessus.pp           # Build Nessus scanner
+│   ├── build_agents.pp           # Build Puppet agent clients
+│   ├── destroy_clients.pp        # Destroy agent clients with PE purge
 │   ├── fetch_ca_cert.pp          # Download CA cert from PE server
 │   └── puppet_access_login.pp    # Login to PE console
 ├── tasks/                        # Bolt tasks
@@ -53,18 +61,23 @@ proxtoboltfu/
 
 All VMs are tagged in Terraform and dynamically discovered by Bolt:
 
-**Infrastructure Tags:**
-- `puppetinfra;puppet;prod;ubuntu` - Puppet Enterprise servers
-- `puppetinfra;scm;prod;ubuntu` - SCM/Comply servers
-- `puppetinfra;cd4pe;prod;ubuntu` - CD4PE servers
-- `puppetagents;prod;ubuntu` - Puppet agent nodes
+**Key Classification Tags:**
+- `puppetinfra` - All infrastructure servers
+- `puppet` - Puppet Enterprise servers
+- `scm` - SCM/Comply servers
+- `cd4pe` - CD4PE servers
+- `dashboard` - Dashboard servers
+- `nessus` - Nessus scanners
+- `puppetagents` - Puppet agent nodes
 
 **Inventory Groups:**
-- `puppet-infrastructure` - All infrastructure (tag: `puppetinfra`)
-- `puppet-enterprise-nodes` - PE servers only (tag: `puppet`)
-- `scm-nodes` - SCM servers only (tag: `scm`)
-- `cd4pe-nodes` - CD4PE servers only (tag: `cd4pe`)
-- `puppet-agents` - Agent nodes (tag: `puppetagents`)
+- `puppet-infrastructure` - All infrastructure (filter: `puppetinfra`)
+- `puppet-enterprise-nodes` - PE servers only (filter: `puppet`)
+- `scm-nodes` - SCM servers only (filter: `scm`)
+- `cd4pe-nodes` - CD4PE servers only (filter: `cd4pe`)
+- `dashboard-nodes` - Dashboard servers only (filter: `dashboard`)
+- `nessus-nodes` - Nessus scanners only (filter: `nessus`)
+- `puppet-agents` - Agent nodes (filter: `puppetagents`)
 
 Tag filtering uses exact matching with boundaries to prevent substring matches (e.g., `puppet` won't match `puppetinfra`).
 
@@ -89,12 +102,17 @@ Returns JSON with targets including name, IP, and tags in vars:
   "value": [
     {
       "name": "new-puppet.albatrossflavour.com",
-      "uri": "192.168.7.100",
+      "uri": "192.168.10.100",
       "vars": {"tags": "prod;puppet;puppetinfra;ubuntu"}
     }
   ]
 }
 ```
+
+The script handles multiple IP scenarios:
+- Static IPs: Extracted from `ipconfig0` parameter
+- DHCP: Falls back to using hostname for DNS resolution
+- Guest Agent: Uses `default_ipv4_address` if available from Proxmox guest agent
 
 ### 4. Hiera Configuration
 
@@ -155,7 +173,26 @@ config:
 
 ## Deployment Workflow
 
-### Full Stack Deployment
+### Full Stack Deployment (Single Command)
+
+```bash
+bolt plan run proxtoboltfu::build_environment
+```
+
+This orchestrates the complete deployment:
+1. Provisions infrastructure with OpenTofu (VMs + DNS)
+2. Builds Puppet Enterprise server
+3. Builds additional infrastructure (SCM, CD4PE, Dashboard, Nessus) in parallel
+4. Builds agent nodes if any exist
+
+To skip infrastructure provisioning (if VMs already exist):
+```bash
+bolt plan run proxtoboltfu::build_environment apply_terraform=false
+```
+
+### Manual Step-by-Step Deployment
+
+If you prefer manual control:
 
 1. **Provision Infrastructure:**
    ```bash
@@ -170,26 +207,109 @@ config:
    bolt plan run proxtoboltfu::build_pe
    ```
 
-3. **Build SCM and CD4PE (can run in parallel):**
+3. **Build Additional Infrastructure (can run in parallel):**
    ```bash
    bolt plan run proxtoboltfu::build_scm
    bolt plan run proxtoboltfu::build_cd4pe
+   bolt plan run proxtoboltfu::build_dashboard
+   bolt plan run proxtoboltfu::build_nessus
    ```
 
-4. **Post-Installation:**
+4. **Build Agent Nodes:**
    ```bash
-   bolt plan run proxtoboltfu::fetch_ca_cert
-   bolt plan run proxtoboltfu::puppet_access_login console_password=<password>
+   bolt plan run proxtoboltfu::build_agents
    ```
 
-5. **Provision Agents (when you have agent VMs):**
-   ```bash
-   bolt command run 'puppet agent -t' --targets puppet-agents
-   ```
+### Managing Agent Clients
+
+**Client Configuration** (tf/terraform.tfvars):
+```hcl
+# OS Distribution Controls
+enable_alma        = false
+enable_centos      = false
+enable_debian      = false
+enable_oracle      = false
+enable_redhat      = false
+enable_rocky       = false
+enable_ubuntu      = true
+enable_opensuse    = false
+enable_amazonlinux = false
+
+# Client Counts per Environment
+prod_clients = 1  # Number of clients per OS in production
+dev_clients  = 0  # Number of clients per OS in development
+```
+
+With `enable_ubuntu=true`, `prod_clients=1`, `dev_clients=0`:
+- Creates 3 prod clients (one for each Ubuntu version: 20.04, 22.04, 24.04)
+- Creates 0 dev clients
+- Each client gets static IP assigned sequentially starting at .10
+- DNS records created automatically
+
+**Deploy Clients:**
+```bash
+cd tf && tofu apply  # Create VMs
+bolt plan run proxtoboltfu::build_agents  # Configure agents
+```
+
+**Destroy Clients:**
+```bash
+# Preview what will be destroyed
+bolt plan run proxtoboltfu::destroy_clients
+
+# Actually destroy (purges from PE, then destroys VMs)
+bolt plan run proxtoboltfu::destroy_clients confirm=true
+```
+
+The destroy process automatically:
+1. Lists agents to be destroyed
+2. Purges agent certificates from Puppet Enterprise (via destroy provisioner in Terraform)
+3. Destroys VMs
+4. Removes DNS records
+
+### Client Architecture
+
+**clients.tf** uses for_each with locals to dynamically create agents:
+
+```hcl
+locals {
+  os_configurations = {
+    "ubuntu-2004-prod" = {
+      os_family    = "ubuntu"
+      version      = "2004"
+      environment  = "prod"
+      template     = "template-Ubuntu-2004"
+      vmid_base    = "91230"
+      enabled      = var.enable_ubuntu
+      client_count = var.prod_clients
+    }
+    # ... more OS configurations
+  }
+
+  # Sequential IP allocation starting at .10
+  puppet_clients = [
+    for idx, client in local.puppet_clients_base : merge(client, {
+      ip_address = "192.168.10.${10 + idx}"
+    })
+  ]
+}
+```
+
+**Features:**
+- Single resource definition for all agent types
+- Sequential static IP allocation
+- Automatic DNS record creation
+- Destroy provisioner for PE purge
+
+**Scaling:**
+- Enable OS families via `enable_*` flags
+- Set client counts with `prod_clients` and `dev_clients`
+- Total agents = (enabled OS versions) × (prod + dev clients)
+- Example: 9 OS families × 2 versions avg × (5 prod + 3 dev) = 144 agents
 
 ### Adding New Infrastructure Types
 
-To add a new type of infrastructure (e.g., compilers, monitoring):
+To add a new type of infrastructure (e.g., compilers):
 
 1. **Create Terraform resource with appropriate tags:**
    ```hcl

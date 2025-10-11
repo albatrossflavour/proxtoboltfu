@@ -24,6 +24,17 @@ plan proxtoboltfu::build_scm {
   out::message("Puppet Server: ${puppet_server}")
   out::message("")
 
+  # Check if Puppet is already installed
+  out::message("Checking if Puppet is already installed...")
+  $check_puppet = run_command('test -f /usr/local/bin/puppet', $targets, '_catch_errors' => true)
+
+  if $check_puppet.ok {
+    out::message("✓ Puppet already installed on ${targets}, skipping installation")
+    return { status => 'already_installed' }
+  }
+
+  out::message("Puppet not found, proceeding with installation...")
+
   # Insert CSR extension requests for SCM classification
   out::message("Setting up CSR extension requests")
 
@@ -52,9 +63,9 @@ plan proxtoboltfu::build_scm {
   out::message("Running Puppet agent")
   run_task('peadm::puppet_runonce', $targets)
 
-  # Install using complyadm module
-  out::message("Installing SCM")
-  run_plan('complyadm::install')
+  # Install using complyadm module from existing hiera config
+  out::message("Installing SCM from config (data/scm.yaml)")
+  run_plan('complyadm::install_from_config')
 
   # Run Puppet twice to ensure configuration converges
   out::message("Running Puppet agent to apply configuration")

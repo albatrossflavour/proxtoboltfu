@@ -25,8 +25,19 @@ for resource in $resources; do
   fi
 
   name=$(echo "$state" | grep -E '^\s+name\s+=' | sed -n 's/.*= "\(.*\)"/\1/p')
-  ip=$(echo "$state" | grep ipconfig0 | sed -n 's/.*ip=\([^/]*\).*/\1/p')
+  ip=$(echo "$state" | grep ipconfig0 | sed -n 's/.*ip=\([^/"]*\).*/\1/p')
   tags=$(echo "$state" | grep -E '^\s+tags\s+=' | sed -n 's/.*= "\(.*\)"/\1/p')
+
+  # Try to get actual IP from guest agent if available
+  default_ip=$(echo "$state" | grep -E '^\s+default_ipv4_address\s+=' | sed -n 's/.*= "\(.*\)"/\1/p')
+
+  # Use default_ipv4_address if available, otherwise use extracted IP
+  # If IP is "dhcp", fall back to hostname for DNS resolution
+  if [ -n "$default_ip" ]; then
+    ip="$default_ip"
+  elif [ "$ip" = "dhcp" ]; then
+    ip="$name"
+  fi
 
   # Apply tag filter if specified
   if [ -n "$PT_tag_filter" ]; then
