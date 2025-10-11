@@ -1,5 +1,3 @@
-# This Puppetfile is managed by Bolt. Do not edit.
-# For more information, see https://pup.pt/bolt-modules
 mod 'puppetlabs/complyadm', '3.5.0'
 mod 'puppetlabs/cd4peadm', '5.11.0'
 mod 'puppetlabs/peadm', '3.33.0'
@@ -19,3 +17,11 @@ mod 'puppetlabs/powershell', '6.0.2'
 mod 'puppetlabs/reboot', '5.1.0'
 mod 'puppetlabs/facts', '1.7.0'
 mod 'puppetlabs/pwshlib', '1.2.3'
+mod 'puppetlabs/puppet_operational_dashboards', '2.4.0'
+mod 'puppet/grafana', '14.1.0'
+mod 'puppet/telegraf', '5.4.0'
+mod 'puppetlabs/influxdb', '2.4.0'
+mod 'puppet/nginx', '7.0.0'
+mod 'puppetlabs/stdlib',  '9.7.0'
+mod 'puppetlabs/exec', '3.1.0'
+mod 'puppetlabs/puppet_data_connector', '1.0.0'
