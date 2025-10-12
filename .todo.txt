@@ -1,15 +1,16 @@
 # proxtoboltfu TODO List
 # Format: todo.txt (http://todotxt.org/)
+(A) Implement control repo split - See docs/control-repo-split.md for complete plan +critical @architecture
 (A) Create bootstrap task to prompt for deployment variables and update configs +automation @setup
-(A) Create status task/plan to show infrastructure state +monitoring @operations
 (B) Remove temporary vmid_base prefix (9) from Ubuntu servers in clients.tf +bugfix @infrastructure
 (B) Fix destroy provisioner in clients.tf to properly purge nodes from Puppet +bugfix @cleanup
+(B) Enhance status plan with more detailed health checks (PE node count, certificate status, etc) +enhancement @monitoring
 (C) Document wrapper plans for config generation in README/CLAUDE.md +documentation @knowledge
 # Future Enhancements
 Add idempotency check for Dashboard/Nessus installs (like SCM/CD4PE) +enhancement @infrastructure
 Create plan to regenerate configs for existing infrastructure +automation @operations
 Add validation for hiera config files before build +quality @safety
 Create plan to backup/restore hiera configs +backup @operations
-Add health check plan to verify all services are running +monitoring @operations
 Fix the nessus class by auto-generating a token and storing it in hiera during provisioning +automation @operations
 # Completed
+x 2025-10-12 Create status task/plan to show infrastructure state +monitoring @operations
