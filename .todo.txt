@@ -1,25 +1,15 @@
 # proxtoboltfu TODO List
 # Format: todo.txt (http://todotxt.org/)
-
 (A) Create bootstrap task to prompt for deployment variables and update configs +automation @setup
 (A) Create status task/plan to show infrastructure state +monitoring @operations
 (B) Remove temporary vmid_base prefix (9) from Ubuntu servers in clients.tf +bugfix @infrastructure
 (B) Fix destroy provisioner in clients.tf to properly purge nodes from Puppet +bugfix @cleanup
 (C) Document wrapper plans for config generation in README/CLAUDE.md +documentation @knowledge
-
 # Future Enhancements
 Add idempotency check for Dashboard/Nessus installs (like SCM/CD4PE) +enhancement @infrastructure
 Create plan to regenerate configs for existing infrastructure +automation @operations
 Add validation for hiera config files before build +quality @safety
 Create plan to backup/restore hiera configs +backup @operations
 Add health check plan to verify all services are running +monitoring @operations
-
+Fix the nessus class by auto-generating a token and storing it in hiera during provisioning +automation @operations
 # Completed
-x 2025-10-10 Update hiera.yaml to support separate config files +config
-x 2025-10-10 Fix destroy provisioner in clients.tf to use bolt with --targets +bugfix
-x 2025-10-10 Add idempotency checks to all build plans +quality
-x 2025-10-10 Move PE config from common.yaml to pe.yaml +config
-x 2025-10-10 Create wrapper plans for SCM and CD4PE config generation +automation
-x 2025-10-10 Update build plans to use config generation +infrastructure
-x 2025-10-10 Create destroy_environment plan +automation
-x 2025-10-10 Replace terraform references with tofu in comments +cleanup
