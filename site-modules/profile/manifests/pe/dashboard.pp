@@ -13,10 +13,10 @@ class profile::pe::dashboard {
   #  manage_package => false,
   #}
 
-  profile::soe::pinned_package { 'telegraf':
-    version        => 'telegraf-1.29.4-1.x86_64',
-    manage_package => false,
-  }
+  #profile::soe::pinned_package { 'telegraf':
+  #  version        => 'telegraf-1.29.4-1.x86_64',
+  #  manage_package => false,
+  #}
 
 
   #contain openssl
@@ -33,7 +33,7 @@ class profile::pe::dashboard {
         'scrape_timeout'  => '10s',
         'static_configs'  => [
           {
-            'targets' => [ 'puppet.lab.albatrossflavour.com:9100' ],
+            'targets' => [ "${facts['puppet_master_server']}:9100" ],
             'labels'  => { 'alias' => 'Puppet', }
           }
         ],
@@ -45,7 +45,7 @@ class profile::pe::dashboard {
   #  commonname => $facts['networking']['fqdn'],
   #}
 
-  nginx::resource::server { 'dashboard.lab.albatrossflavour.com':
+  nginx::resource::server { $facts['networking']['fqdn']:
     ssl         => false,
     #ssl_port    => 443,
     listen_port => 80,
