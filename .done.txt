@@ -6,3 +6,4 @@ x 2025-10-10 Create wrapper plans for SCM and CD4PE config generation +automatio
 x 2025-10-10 Update build plans to use config generation +infrastructure
 x 2025-10-10 Create destroy_environment plan +automation
 x 2025-10-10 Replace terraform references with tofu in comments +cleanup
+x 2025-10-12 Create bootstap task +release
