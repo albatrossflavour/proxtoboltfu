@@ -7,5 +7,5 @@
 #
 class profile::base {
   contain profile::soe::hosts
-  #contain profile::soe::cis
+  contain profile::soe::cis
 }
