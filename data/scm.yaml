@@ -1,3 +1,11 @@
+sce_linux::benchmark: "cis"
+sce_linux::allow_on_kubernetes_node: false
+sce_linux::regenerate_grub2_config: false
+sce_linux::merge_behavior: "deep"
+sce_linux::config:
+  profile: "server"
+  level: "1"
+  firewall_type: "firewalld"
 complyadm::config:
   targets:
     backend:

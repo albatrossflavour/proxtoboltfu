@@ -10,4 +10,3 @@ nessus::config:
 nessus::csr_attributes:
   datacenter: lab
   role: role::nessus
-  environment: production
