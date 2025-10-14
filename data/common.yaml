@@ -1,3 +1,4 @@
+enable_sce: false
 dashboard::config:
   resolvable_hostname: new-dashboard.albatrossflavour.com
 dashboard::csr_attributes:
