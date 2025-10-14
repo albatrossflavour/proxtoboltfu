@@ -1,12 +1,11 @@
----
 complyadm::config:
   targets:
     backend:
-    - new-scm.albatrossflavour.com
+      - new-scm.albatrossflavour.com
     database:
-    - new-scm.albatrossflavour.com
+      - new-scm.albatrossflavour.com
     ui:
-    - new-scm.albatrossflavour.com
+      - new-scm.albatrossflavour.com
   admin_db_password: ENC[PKCS7,MIIBmQYJKoZIhvcNAQcDoIIBijCCAYYCAQAxggEhMIIBHQIBADAFMAACAQEwDQYJKoZIhvcNAQEBBQAEggEAWiGyYRZWo+24oocAwBbJVvUKASdhGFAuc7d6pz0dfcgHKxojmhoHJa4w6md6AuZCdYmKtTtJ8laRdtRrGI2Jy05J3KctlogU75Aew95R7yHanpwYAYq5Yp4Xaj7YlWWcdmeXdslpllIldIn5TS2jjlJyfRRM/IL+uV52Mc5R5Z+TIyt4ZwJFgU6RTqiDkxpVMFG/xbpgybhQ+now84fIKBA+naL1SdsVGFtIL3wCNPq9qxnJOXRdPGIbEufLYEADKDedWRhjUvO9X5PwNxkJ/CrQfd2PUBg3OgqMp3sAfbxvQf+YODc0o76vDxmd4BBGQfSkpxAKOvt+5/B+SNfJ3jBcBgkqhkiG9w0BBwEwHQYJYIZIAWUDBAEqBBDpdZmWdETU089nFWyy0GvmgDCfzAVxeCVQvbQCzZSDHeiIkFJUbKfhCaY0Cdp7WgKkpnWsfI2HB/sMv4hPBrFPzZc=]
   comply_db_password: ENC[PKCS7,MIIBmQYJKoZIhvcNAQcDoIIBijCCAYYCAQAxggEhMIIBHQIBADAFMAACAQEwDQYJKoZIhvcNAQEBBQAEggEAaD4PNmAGStSWWafN0a3nqqJfXmjFtGC71sxEqsRH5Io7GxKFlh5ya663X2n/4sffhTFZmRExYkkalnjx/xfUItG+0D2bS6xSTb267JXEAzF72JekF7AXekpMR8UymDmR46QvHscLIC6zlp1hU9qR6MOgw8i9cSfj7qTi/IWBj4n04EuMpLg8JHkscx0MXu028rHfK2RquFWlZqCtLANQ63KYRl5R6alztTFkr+QFumLvznCHgFh5G+RH0hrmh5MKPNzFRtKnVv6B6+sotnSjMCSVvSvjzu1SDZkJYeXW8A5FcU6BNvXl9e9DCY7YLwxqxfsiCpYTvsZYSgm6t17mEzBcBgkqhkiG9w0BBwEwHQYJYIZIAWUDBAEqBBDgS8yCkoDhnlfCCalrG9CQgDDb6fLR2tYP797mw0QylYZQ79rRVhCpmsqZzrBxSOApOFQ5uw1vTQKLLHzyM/VLThU=]
   comply_db_username: comply

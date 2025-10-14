@@ -1,10 +1,10 @@
 resource "proxmox_vm_qemu" "new-scm-server" {
-  count                  = var.puppet_scm ? 1 : 0
-  vmid                   = "998"
-  target_nodes           = ["ankh", "morpork"]
-  tags                   = "puppetinfra;scm;prod;ubuntu"
-  description            = "Puppet SCM server"
-  onboot                 = true
+  count        = var.puppet_scm ? 1 : 0
+  vmid         = "998"
+  target_nodes = ["ankh", "morpork"]
+  tags         = "puppetinfra;scm;prod;ubuntu"
+  description  = "Puppet SCM server"
+  onboot       = true
   #hastate                = "started"
   agent                  = 1
   qemu_os                = "l26"
@@ -20,8 +20,8 @@ resource "proxmox_vm_qemu" "new-scm-server" {
     sockets = 2
     numa    = false
   }
-  memory     = 8192
-  name       = "new-scm.${var.domain}"
+  memory = 8192
+  name   = "new-scm.${var.domain}"
   #protection = true
   bootdisk   = "scsi0"
   scsihw     = "virtio-scsi-single"

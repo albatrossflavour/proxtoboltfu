@@ -1,10 +1,10 @@
 resource "proxmox_vm_qemu" "new-puppet-server" {
-  count                  = var.puppet_pe ? 1 : 0
-  vmid                   = "999"
-  target_nodes           = ["stolat"]
-  tags                   = "puppetinfra;puppet;prod;ubuntu"
-  description            = "Puppet primary server"
-  onboot                 = true
+  count        = var.puppet_pe ? 1 : 0
+  vmid         = "999"
+  target_nodes = ["stolat"]
+  tags         = "puppetinfra;puppet;prod;ubuntu"
+  description  = "Puppet primary server"
+  onboot       = true
   #hastate                = "started"
   agent                  = 1
   qemu_os                = "l26"
@@ -20,8 +20,8 @@ resource "proxmox_vm_qemu" "new-puppet-server" {
     sockets = 3
     numa    = false
   }
-  memory     = 16384
-  name       = "new-puppet.${var.domain}"
+  memory = 16384
+  name   = "new-puppet.${var.domain}"
   #protection = true
   bootdisk   = "scsi0"
   scsihw     = "virtio-scsi-single"

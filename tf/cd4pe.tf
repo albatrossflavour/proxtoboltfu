@@ -1,10 +1,10 @@
 resource "proxmox_vm_qemu" "new-cd4pe-server" {
-  count                  = var.puppet_cd4pe ? 1 : 0
-  vmid                   = "997"
-  target_nodes           = ["ankh", "morpork"]
-  tags                   = "puppetinfra;cd4pe;prod;ubuntu"
-  description            = "Puppet CD4PE server"
-  onboot                 = true
+  count        = var.puppet_cd4pe ? 1 : 0
+  vmid         = "997"
+  target_nodes = ["ankh", "morpork"]
+  tags         = "puppetinfra;cd4pe;prod;ubuntu"
+  description  = "Puppet CD4PE server"
+  onboot       = true
   #hastate                = "started"
   agent                  = 1
   qemu_os                = "l26"
@@ -20,8 +20,8 @@ resource "proxmox_vm_qemu" "new-cd4pe-server" {
     sockets = 2
     numa    = false
   }
-  memory     = 8192
-  name       = "new-cd4pe.${var.domain}"
+  memory = 8192
+  name   = "new-cd4pe.${var.domain}"
   #protection = true
   bootdisk   = "scsi0"
   scsihw     = "virtio-scsi-single"

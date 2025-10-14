@@ -1,10 +1,9 @@
----
 version: 2
 config:
   transport: ssh
   ssh:
     private-key: ~/.ssh/id_ed25519
-    user: tgreen  # Update this to your SSH username
+    user: tgreen # Update this to your SSH username
     run-as: root
     host-key-check: false
     tmpdir: /var/tmp

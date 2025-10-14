@@ -21,34 +21,34 @@ plan proxtoboltfu::generate_terraform_files (
 
   # Parse template data from Proxmox
   $template_lines = split($template_data, '\n').filter |$line| { $line and $line != '' }
-  
+
   if $template_lines.empty {
     fail("No valid template lines found in data. Check that templates exist on Proxmox.")
   }
 
   # Parse template data - simplified approach
   $templates = {}
-  
+
   $template_lines.each |$line| {
     if $line and $line != '' {
       $parts = split($line, ',')
       if $parts.length >= 2 {
         $vmid = $parts[0]
         $name = $parts[1]
-        
+
         # Extract OS info from template name (template-OS-Version)
         $name_parts = split($name, '-')
         if $name_parts.length >= 3 {
           $os_name = downcase($name_parts[1])
           $os_version = $name_parts[2]
           $template_key = "${os_name}${os_version}"
-          
+
           out::message("Found template: ${template_key} -> ${name} (${vmid})")
         }
       }
     }
   }
-  
+
   # For now, create a simple example template
   $templates = {
     'alma8' => {
@@ -74,7 +74,7 @@ plan proxtoboltfu::generate_terraform_files (
   $terraform_locals = @("TERRAFORM_LOCALS")
     # Generated automatically by proxtoboltfu::generate_terraform_files
     # DO NOT EDIT MANUALLY - this file is regenerated when templates change
-    
+
     locals {
       # Available VM templates from Proxmox
       # Based on actual templates that exist and are ready for use
@@ -97,12 +97,12 @@ plan proxtoboltfu::generate_terraform_files (
       }.join(",\n")
     }
       }
-      
+
       # Helper maps for easier reference
       template_ids = {
         for k, v in local.vm_templates : k => v.template_id
       }
-      
+
       template_names = {
         for k, v in local.vm_templates : k => v.template_name
       }
@@ -111,7 +111,7 @@ plan proxtoboltfu::generate_terraform_files (
 
   # Write the generated Terraform file
   $terraform_file = 'tf/generated_templates.tf'
-  
+
   out::message("💾 Writing Terraform configuration to ${terraform_file}")
   file::write($terraform_file, $terraform_locals)
 
@@ -119,15 +119,15 @@ plan proxtoboltfu::generate_terraform_files (
   $summary_content = @("SUMMARY")
     # proxtoboltfu Template Generation Summary
     # Generated: ${timestamp()}
-    
+
     ## Available Templates
-    
+
     ${templates.map |$key, $template| {
       "- **${key}**: ${template['name']} (ID: ${template['vmid']})"
     }.join("\n")}
-    
+
     ## Usage in Terraform
-    
+
     ```hcl
     # Reference templates using local values:
     ${templates.keys[0,3].map |$key| {
@@ -141,7 +141,7 @@ plan proxtoboltfu::generate_terraform_files (
       | EXAMPLE
     }.join("\n\n")}
     ```
-    
+
     Total templates: ${templates.length}
     Storage backend: ${storage}
     | SUMMARY
@@ -153,7 +153,7 @@ plan proxtoboltfu::generate_terraform_files (
   out::message("✅ Terraform template files generated successfully")
   out::message("🎯 Templates are now available for use in Terraform configurations")
 
-  return { 
+  return {
     status => 'completed',
     templates_generated => $templates.length,
     terraform_file => $terraform_file,

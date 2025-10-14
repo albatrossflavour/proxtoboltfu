@@ -1,10 +1,10 @@
 resource "proxmox_vm_qemu" "nessus-server" {
-  count                  = var.nessus ? 1 : 0
-  vmid                   = "995"
-  target_nodes           = ["ankh", "morpork"]
-  tags                   = "puppetinfra;nessus;prod;ubuntu"
-  description            = "Nessus security scanner server"
-  onboot                 = true
+  count        = var.nessus ? 1 : 0
+  vmid         = "995"
+  target_nodes = ["ankh", "morpork"]
+  tags         = "puppetinfra;nessus;prod;ubuntu"
+  description  = "Nessus security scanner server"
+  onboot       = true
   #hastate                = "started"
   agent                  = 1
   qemu_os                = "l26"
@@ -20,8 +20,8 @@ resource "proxmox_vm_qemu" "nessus-server" {
     sockets = 2
     numa    = false
   }
-  memory     = 4096
-  name       = "new-nessus.${var.domain}"
+  memory = 4096
+  name   = "new-nessus.${var.domain}"
   #protection = true
   bootdisk   = "scsi0"
   scsihw     = "virtio-scsi-single"

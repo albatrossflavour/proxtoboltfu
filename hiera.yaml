@@ -1,18 +1,15 @@
----
 version: 5
-
 defaults:
   datadir: data
   data_hash: yaml_data
-
 hierarchy:
-  - name: 'Eyaml Config'
+  - name: "Eyaml Config"
     lookup_key: eyaml_lookup_key
     options:
       pkcs7_private_key: keys/private_key.pkcs7.pem
       pkcs7_public_key: keys/public_key.pkcs7.pem
     paths:
-      - 'pe.yaml'
-      - 'scm.yaml'
-      - 'cd4pe.yaml'
-      - 'common.yaml'
+      - "pe.yaml"
+      - "scm.yaml"
+      - "cd4pe.yaml"
+      - "common.yaml"

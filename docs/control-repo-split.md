@@ -2,15 +2,25 @@
 
 ## Executive Summary
 
-**Problem:** Bolt's `bolt module install` overwrites the Puppetfile, creating an unsolvable conflict between Bolt's module management and Puppet control repo requirements.
+**Problem:** Bolt's `bolt module install` overwrites the
+Puppetfile, creating an unsolvable conflict between Bolt's module
+management and Puppet control repo requirements.
 
-**Solution:** Split Puppet control repo into a separate repository with proper Code Manager integration, while proxtoboltfu retains only bootstrap/provisioning code.
+**Solution:** Split Puppet control repo into a separate
+repository with proper Code Manager integration, while
+proxtoboltfu retains only bootstrap/provisioning code.
 
-**Key Innovation:** Day-2 operations (upgrades, maintenance) read configuration from running infrastructure (which uses control repo), NOT from Bolt's hiera. This eliminates drift issues entirely.
+**Key Innovation:** Day-2 operations (upgrades, maintenance)
+read configuration from running infrastructure (which uses
+control repo), NOT from Bolt's hiera. This eliminates drift
+issues entirely.
 
-**Implementation:** 7 phases covering bootstrap, hiera restructuring, Code Manager setup, cleanup, and day-2 operational patterns.
+**Implementation:** 7 phases covering bootstrap, hiera
+restructuring, Code Manager setup, cleanup, and day-2
+operational patterns.
 
 **Outcome:**
+
 - Clean architectural separation (bootstrap vs operations)
 - Standard Puppet control repo structure with role-based hiera
 - No Puppetfile conflicts
@@ -21,22 +31,43 @@
 
 ## Problem
 
-**Root cause:** Bolt manages its module dependencies via `bolt-project.yaml`, and when you run `bolt module install`, it **overwrites the Puppetfile** with modules needed for Bolt operations.
+**Root cause:** Bolt manages its module dependencies via
+`bolt-project.yaml`, and when you run `bolt module install`, it
+**overwrites the Puppetfile** with modules needed for Bolt
+operations.
 
-**The conflict:** A single Puppetfile cannot serve two purposes:
-- **Bolt's Puppetfile:** Auto-generated from `bolt-project.yaml`, contains modules for infrastructure provisioning (peadm, complyadm, cd4peadm) installed to `.modules/`
-- **Control repo Puppetfile:** Hand-crafted for Puppet code, contains modules for agent configuration deployed by Code Manager to `/etc/puppetlabs/code/environments/`
+### The conflict
 
-**Impact:**
-- Running `bolt module install` destroys the control repo Puppetfile
-- Ongoing Bolt operations (maintenance, upgrades) will repeatedly regenerate the Puppetfile, overwriting control repo module definitions
-- Cannot maintain stable Puppet module dependencies for agents while using Bolt tooling
+A single Puppetfile cannot serve two purposes:
+
+- **Bolt's Puppetfile:** Auto-generated from
+  `bolt-project.yaml`, contains modules for infrastructure
+  provisioning (peadm, complyadm, cd4peadm) installed to
+  `.modules/`
+- **Control repo Puppetfile:** Hand-crafted for Puppet code,
+  contains modules for agent configuration deployed by Code
+  Manager to `/etc/puppetlabs/code/environments/`
+
+### Impact
+
+- Running `bolt module install` destroys the control repo
+  Puppetfile
+- Ongoing Bolt operations (maintenance, upgrades) will
+  repeatedly regenerate the Puppetfile, overwriting control repo
+  module definitions
+- Cannot maintain stable Puppet module dependencies for agents
+  while using Bolt tooling
 
 ## Solution
 
-Split the Puppet control repo into a separate repository, using the puppetlabs/control-repo template as foundation, then deploy via Code Manager.
+Split the Puppet control repo into a separate repository, using
+the puppetlabs/control-repo template as foundation, then deploy
+via Code Manager.
 
-**Critical Design Decision:** Control repo becomes the source of truth for ALL operational configuration after initial bootstrap. Bolt's day-2 plans read configuration from running infrastructure (not stale Bolt hiera), eliminating drift problems.
+**Critical Design Decision:** Control repo becomes the source of
+truth for ALL operational configuration after initial bootstrap.
+Bolt's day-2 plans read configuration from running infrastructure
+(not stale Bolt hiera), eliminating drift problems.
 
 ---
 
@@ -54,8 +85,10 @@ rm -rf .git
 git init
 ```
 
-**Template provides:**
-- Standard directory structure (`manifests/`, `site-modules/`, `data/`)
+Template provides:
+
+- Standard directory structure (`manifests/`,
+  `site-modules/`, `data/`)
 - Example `Puppetfile` with common modules
 - `environment.conf` configured for Code Manager
 - `hiera.yaml` for environment-level data
@@ -64,10 +97,12 @@ git init
 #### 1.2 Configure Git Remote
 
 ```bash
-git remote add origin <your-git-server>/puppet-control-repo.git
+git remote add origin \
+  <your-git-server>/puppet-control-repo.git
 ```
 
-**Options:**
+Options:
+
 - GitHub/GitLab/Bitbucket
 - Local Gitea/Gogs
 - PE-integrated Git (if using CD4PE)
@@ -81,10 +116,12 @@ git remote add origin <your-git-server>/puppet-control-repo.git
 ```bash
 # Copy from template directory
 cp -r ~/dev/proxtoboltfu/control-repo-template/manifests .
-cp -r ~/dev/proxtoboltfu/control-repo-template/site-modules .
+cp -r \
+  ~/dev/proxtoboltfu/control-repo-template/site-modules .
 cp -r ~/dev/proxtoboltfu/control-repo-template/scripts .
 cp -r ~/dev/proxtoboltfu/control-repo-template/keys .
-cp ~/dev/proxtoboltfu/control-repo-template/environment.conf .
+cp \
+  ~/dev/proxtoboltfu/control-repo-template/environment.conf .
 cp ~/dev/proxtoboltfu/control-repo-template/hiera.yaml .
 
 # Verify structure
@@ -92,8 +129,10 @@ ls -la
 tree -L 2 manifests/ site-modules/
 ```
 
-**Template provides:**
-- `manifests/site.pp` - Node classification via `$trusted['extensions']['pp_role']`
+Template provides:
+
+- `manifests/site.pp` - Node classification via
+  `$trusted['extensions']['pp_role']`
 - `site-modules/profile/` - Infrastructure profiles
 - `site-modules/role/` - Role definitions
 - `scripts/` - Config version tracking for Code Manager
@@ -103,7 +142,8 @@ tree -L 2 manifests/ site-modules/
 
 #### 2.2 Create Control Repo Puppetfile
 
-**DO NOT** copy Bolt's Puppetfile directly. Create new Puppetfile for Puppet modules only:
+**DO NOT** copy Bolt's Puppetfile directly. Create new
+Puppetfile for Puppet modules only:
 
 ```bash
 cat > Puppetfile <<'EOF'
@@ -125,13 +165,17 @@ mod 'puppetlabs/puppet_agent'
 EOF
 ```
 
-**Analysis needed:**
-- Review `site-modules/profile/manifests/**/*.pp` for module dependencies
-- Add only modules required by Puppet code (not Bolt modules like peadm, complyadm, cd4peadm)
+Analysis needed:
+
+- Review `site-modules/profile/manifests/**/*.pp` for module
+  dependencies
+- Add only modules required by Puppet code (not Bolt modules
+  like peadm, complyadm, cd4peadm)
 
 #### 2.3 Update Hiera Configuration for Role-Based Data
 
-Update the hiera.yaml to follow best practices using trusted facts for role-based lookups:
+Update the hiera.yaml to follow best practices using trusted
+facts for role-based lookups:
 
 ```bash
 cat > hiera.yaml <<'EOF'
@@ -155,9 +199,12 @@ hierarchy:
 EOF
 ```
 
-**Hierarchy structure:**
-1. Per-node data (highest priority): `data/nodes/<certname>.yaml`
-2. Per-role data: `data/roles/<pp_role>.yaml` (uses trusted extension from CSR)
+Hierarchy structure:
+
+1. Per-node data (highest priority):
+   `data/nodes/<certname>.yaml`
+2. Per-role data: `data/roles/<pp_role>.yaml` (uses trusted
+   extension from CSR)
 3. Common data (lowest priority): `data/common.yaml`
 
 #### 2.4 Create Role-Based Hiera Data Files
@@ -209,28 +256,42 @@ cat > data/common.yaml <<'EOF'
 EOF
 ```
 
-**Data migration process:**
+### Data migration process
 
 1. Review `~/dev/proxtoboltfu/data/common.yaml`:
-   - Extract `dashboard::config` and `dashboard::csr_attributes` → `data/roles/role::pe::dashboard.yaml`
-   - Extract `nessus::config` and `nessus::csr_attributes` → `data/roles/role::pe::nessus.yaml`
+
+   - Extract `dashboard::config` and
+     `dashboard::csr_attributes` to
+     `data/roles/role::pe::dashboard.yaml`
+   - Extract `nessus::config` and `nessus::csr_attributes`
+     to `data/roles/role::pe::nessus.yaml`
 
 2. Review `~/dev/proxtoboltfu/data/pe.yaml`:
-   - Extract `profile::pe::agent_types` → `data/roles/role::pe::primary.yaml`
-   - Leave `peadm::config` in proxtoboltfu (Bolt operational data)
 
-3. Review `~/dev/proxtoboltfu/data/scm.yaml` and `~/dev/proxtoboltfu/data/cd4pe.yaml`:
+   - Extract `profile::pe::agent_types` to
+     `data/roles/role::pe::primary.yaml`
+   - Leave `peadm::config` in proxtoboltfu (Bolt
+     operational data)
+
+3. Review `~/dev/proxtoboltfu/data/scm.yaml` and
+   `~/dev/proxtoboltfu/data/cd4pe.yaml`:
+
    - Leave operational config in proxtoboltfu
-   - Copy any profile-specific settings to respective role files
+   - Copy any profile-specific settings to respective role
+     files
 
-**Benefits of this structure:**
+### Benefits of this structure
+
 - Follows Puppet hiera best practices
-- Uses trusted facts (CSR extensions) for role classification
-- Clear separation: role-specific data isolated in `data/roles/`
+- Uses trusted facts (CSR extensions) for role
+  classification
+- Clear separation: role-specific data isolated in
+  `data/roles/`
 - Node-specific overrides possible in `data/nodes/`
 - Common defaults in `data/common.yaml`
 
-**Note:** Eyaml encryption works across all hierarchy levels. Copy encrypted values directly from proxtoboltfu hiera files.
+**Note:** Eyaml encryption works across all hierarchy levels.
+Copy encrypted values directly from proxtoboltfu hiera files.
 
 #### 2.5 Review and Clean Template Files
 
@@ -239,8 +300,9 @@ EOF
 rm -f site-modules/profile/examples/*
 rm -f site-modules/role/examples/*
 
-# Keep .gitignore from template (already configured properly)
-# Review README.md from template and update for your environment
+# Keep .gitignore from template (already configured)
+# Review README.md from template and update for your
+# environment
 ```
 
 ---
@@ -275,7 +337,8 @@ git checkout -b development
 git push -u origin development
 ```
 
-**Branch strategy:**
+Branch strategy:
+
 - `production` branch → production environment in PE
 - `development` branch → development environment
 - Feature branches as needed
@@ -293,48 +356,63 @@ Navigate to: `https://new-puppet.albatrossflavour.com`
 **Console → Classification → PE Master group:**
 
 Add/modify parameters:
+
 ```yaml
 puppet_enterprise::profile::master::code_manager_auto_configure: true
-puppet_enterprise::profile::master::r10k_remote: '<git-repo-url>'
-puppet_enterprise::profile::master::r10k_private_key: '/etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa'
+puppet_enterprise::profile::master::r10k_remote: \
+  "<git-repo-url>"
+puppet_enterprise::profile::master::r10k_private_key: \
+  "/etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa"
 ```
 
-**Git repository URL formats:**
+Git repository URL formats:
+
 - SSH: `git@github.com:username/puppet-control-repo.git`
-- HTTPS: `https://github.com/username/puppet-control-repo.git`
+- HTTPS:
+  `https://github.com/username/puppet-control-repo.git`
 
 #### 4.3 Set Up Deploy Key (SSH)
 
-**On PE server:**
+On PE server:
+
 ```bash
 # Generate deploy key
-ssh-keygen -t ed25519 -f /etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa -C "pe-code-manager"
+ssh-keygen -t ed25519 \
+  -f /etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa \
+  -C "pe-code-manager"
 
 # Set permissions
-chown pe-puppet:pe-puppet /etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa*
-chmod 600 /etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa
+chown pe-puppet:pe-puppet \
+  /etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa*
+chmod 600 \
+  /etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa
 
 # Copy public key
-cat /etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa.pub
+cat \
+  /etc/puppetlabs/puppetserver/ssh/id-control_repo.rsa.pub
 ```
 
-**Add deploy key to Git repository:**
+Add deploy key to Git repository:
+
 - GitHub: Settings → Deploy keys → Add deploy key
 - Paste public key content
 - Grant read-only access (Code Manager only pulls)
 
 #### 4.4 Configure Puppet Access Token
 
-**Generate token for Code Manager API:**
+Generate token for Code Manager API:
+
 ```bash
 # On workstation or PE server
 puppet access login --lifetime 1y
 
 # Generate deployment token
-puppet-code deploy --token-file ~/.puppetlabs/token --dry-run
+puppet-code deploy --token-file ~/.puppetlabs/token \
+  --dry-run
 ```
 
-**Alternative:** Use PE console to generate RBAC token for Code Manager user
+**Alternative:** Use PE console to generate RBAC token for
+Code Manager user
 
 #### 4.5 Test Code Manager Configuration
 
@@ -354,9 +432,8 @@ puppet-code status
 
 #### 5.1 Initial Deployment
 
-**Via Bolt plan (recommended):**
+Via Bolt plan (recommended), create new plan in proxtoboltfu:
 
-Create new plan in proxtoboltfu:
 ```puppet
 # plans/deploy_control_repo.pp
 plan proxtoboltfu::deploy_control_repo(
@@ -378,14 +455,16 @@ plan proxtoboltfu::deploy_control_repo(
     out::message("Control repo deployed successfully")
     out::message($result.first.value['stdout'])
   } else {
-    fail_plan("Failed to deploy control repo: ${result.first.value['stderr']}")
+    $err = $result.first.value['stderr']
+    fail_plan("Failed to deploy control repo: ${err}")
   }
 
   return $result
 }
 ```
 
-**Via CLI:**
+Via CLI:
+
 ```bash
 # From PE server
 puppet-code deploy production --wait
@@ -396,17 +475,19 @@ puppet-code deploy --all --wait
 
 #### 5.2 Verify Deployment
 
-**Check environment paths:**
+Check environment paths:
+
 ```bash
 # On PE server
 ls -la /etc/puppetlabs/code/environments/
 
-# Should show production/ directory with your control repo contents
+# Should show production/ directory with control repo
 ls -la /etc/puppetlabs/code/environments/production/
 ```
 
-**Expected structure:**
-```
+Expected structure:
+
+```text
 /etc/puppetlabs/code/environments/production/
 ├── environment.conf
 ├── hiera.yaml
@@ -421,16 +502,19 @@ ls -la /etc/puppetlabs/code/environments/production/
 
 #### 5.3 Test Agent Classification
 
-**On an agent node:**
+On an agent node:
+
 ```bash
 # Request catalog from PE
 puppet agent -t --environment production
 
 # Verify role is applied
-grep pp_role /opt/puppetlabs/puppet/cache/state/classes.txt
+grep pp_role \
+  /opt/puppetlabs/puppet/cache/state/classes.txt
 ```
 
-**Expected:** Node classified with role from CSR attributes, catalog compiles successfully
+**Expected:** Node classified with role from CSR attributes,
+catalog compiles successfully
 
 ---
 
@@ -438,23 +522,30 @@ grep pp_role /opt/puppetlabs/puppet/cache/state/classes.txt
 
 #### 6.1 Move Control Repo Files to Template Directory
 
-```bash
+````bash
 cd ~/dev/proxtoboltfu
 
 # Create template directory structure
-mkdir -p control-repo-template/{manifests,site-modules,scripts,keys,data}
+mkdir -p \
+  control-repo-template/{manifests,site-modules,scripts,keys,data}
 
-# Move control repo files to template location (preserving in git history)
+# Move control repo files to template location
+# (preserving in git history)
 git mv manifests/ control-repo-template/
 git mv site-modules/ control-repo-template/
 git mv environment.conf control-repo-template/
-git mv scripts/config_version.sh control-repo-template/scripts/
-git mv scripts/config_version.rb control-repo-template/scripts/
-git mv scripts/code_manager_config_version.rb control-repo-template/scripts/
+git mv scripts/config_version.sh \
+  control-repo-template/scripts/
+git mv scripts/config_version.rb \
+  control-repo-template/scripts/
+git mv scripts/code_manager_config_version.rb \
+  control-repo-template/scripts/
 
 # Copy eyaml keys to template (keep originals for Bolt)
-cp keys/private_key.pkcs7.pem control-repo-template/keys/
-cp keys/public_key.pkcs7.pem control-repo-template/keys/
+cp keys/private_key.pkcs7.pem \
+  control-repo-template/keys/
+cp keys/public_key.pkcs7.pem \
+  control-repo-template/keys/
 
 # Create template hiera.yaml with role-based hierarchy
 cat > control-repo-template/hiera.yaml <<'EOF'
@@ -478,10 +569,13 @@ hierarchy:
 EOF
 
 # Create template data structure with role-based files
-mkdir -p control-repo-template/data/roles control-repo-template/data/nodes
+mkdir -p control-repo-template/data/roles \
+  control-repo-template/data/nodes
 
 # Create example role data files
-cat > control-repo-template/data/roles/role::pe::dashboard.yaml <<'EOF'
+cat > \
+  control-repo-template/data/roles/role::pe::dashboard.yaml \
+  <<'EOF'
 ---
 # Dashboard role configuration
 # Migrated from proxtoboltfu/data/common.yaml
@@ -494,7 +588,9 @@ dashboard::csr_attributes:
 # dashboard::grafana_admin_password: <copy encrypted value>
 EOF
 
-cat > control-repo-template/data/roles/role::pe::nessus.yaml <<'EOF'
+cat > \
+  control-repo-template/data/roles/role::pe::nessus.yaml \
+  <<'EOF'
 ---
 # Nessus role configuration
 # Migrated from proxtoboltfu/data/common.yaml
@@ -506,7 +602,9 @@ nessus::csr_attributes:
   environment: production
 EOF
 
-cat > control-repo-template/data/roles/role::pe::primary.yaml <<'EOF'
+cat > \
+  control-repo-template/data/roles/role::pe::primary.yaml \
+  <<'EOF'
 ---
 # PE Primary server configuration
 # Migrated from proxtoboltfu/data/pe.yaml
@@ -523,12 +621,16 @@ profile::pe::agent_types:
   - pe_repo::platform::windows_x86_64
 EOF
 
-cat > control-repo-template/data/roles/role::pe::scm.yaml <<'EOF'
+cat > \
+  control-repo-template/data/roles/role::pe::scm.yaml \
+  <<'EOF'
 ---
 # SCM role configuration (if needed beyond profile defaults)
 EOF
 
-cat > control-repo-template/data/roles/role::pe::cd4pe.yaml <<'EOF'
+cat > \
+  control-repo-template/data/roles/role::pe::cd4pe.yaml \
+  <<'EOF'
 ---
 # CD4PE role configuration (if needed beyond profile defaults)
 EOF
@@ -560,38 +662,47 @@ Copy these files when creating a new control repo:
 
 ```bash
 cd ~/dev/puppet-control-repo
-cp -r ~/dev/proxtoboltfu/control-repo-template/manifests .
-cp -r ~/dev/proxtoboltfu/control-repo-template/site-modules .
+cp -r \
+  ~/dev/proxtoboltfu/control-repo-template/manifests .
+cp -r \
+  ~/dev/proxtoboltfu/control-repo-template/site-modules .
 cp -r ~/dev/proxtoboltfu/control-repo-template/scripts .
 cp -r ~/dev/proxtoboltfu/control-repo-template/keys .
-cp ~/dev/proxtoboltfu/control-repo-template/environment.conf .
-cp ~/dev/proxtoboltfu/control-repo-template/hiera.yaml .
+cp \
+  ~/dev/proxtoboltfu/control-repo-template/environment.conf .
+cp \
+  ~/dev/proxtoboltfu/control-repo-template/hiera.yaml .
 ```
 
-See `docs/control-repo-split.md` for full implementation details.
+See `docs/control-repo-split.md` for full
+implementation details.
 EOF
-
-# Keep Bolt-specific files in root
-# - Puppetfile (Bolt modules, auto-generated from bolt-project.yaml)
-# - plans/ (Bolt plans)
-# - tasks/ (Bolt tasks)
-# - data/ (Bolt operational data)
-# - hiera.yaml (Bolt hiera config)
-# - keys/ (eyaml keys for Bolt hiera)
 ```
+
+Keep Bolt-specific files in root:
+
+- Puppetfile (Bolt modules, auto-generated)
+- plans/ (Bolt plans)
+- tasks/ (Bolt tasks)
+- data/ (Bolt operational data)
+- hiera.yaml (Bolt hiera config)
+- keys/ (eyaml keys for Bolt hiera)
 
 #### 6.2 Clean Bootstrap Hiera After Deployment
 
-**Run after successful control repo deployment:**
+Run after successful control repo deployment:
 
 ```bash
 # Clean up migrated hiera values
-bolt plan run proxtoboltfu::cleanup_bootstrap_hiera confirm=true
-```
+bolt plan run proxtoboltfu::cleanup_bootstrap_hiera \
+  confirm=true
+````
 
-This removes values that have migrated to control repo and replaces them with pointers.
+This removes values that have migrated to control repo and
+replaces them with pointers.
 
-**Before cleanup (data/common.yaml):**
+Before cleanup (data/common.yaml):
+
 ```yaml
 dashboard::config:
   resolvable_hostname: new-dashboard.albatrossflavour.com
@@ -600,44 +711,52 @@ nessus::config:
   resolvable_hostname: new-nessus.albatrossflavour.com
 ```
 
-**After cleanup (data/common.yaml):**
+After cleanup (data/common.yaml):
+
 ```yaml
 ---
-# WARNING: BOOTSTRAP HIERA - VALUES MIGRATED TO CONTROL REPO
+# WARNING: BOOTSTRAP HIERA
+# VALUES MIGRATED TO CONTROL REPO
 #
 # This file previously contained operational configuration.
 # Those values now live in: puppet-control-repo/data/roles/
 #
 # Removed (now in control repo):
 # - dashboard::config → data/roles/role::pe::dashboard.yaml
-# - dashboard::grafana_admin_password → data/roles/role::pe::dashboard.yaml
+# - dashboard::grafana_admin_password →
+#   data/roles/role::pe::dashboard.yaml
 # - nessus::config → data/roles/role::pe::nessus.yaml
 #
 # See: docs/control-repo-split.md
 #
-# This file intentionally minimal - add values only if needed for bootstrap.
+# This file intentionally minimal - add values only if
+# needed for bootstrap.
 ```
 
-**Values removed from Bolt hiera:**
+Values removed from Bolt hiera:
+
 - Application passwords (dashboard, nessus)
 - Console password
 - Forge authorization tokens
 - Code Manager credentials
 - Agent platform repositories
 
-**Values retained in Bolt hiera:**
+Values retained in Bolt hiera:
+
 - PE license key (needed for reprovisioning)
 - Initial version pins (for reference)
 - Bootstrap network config (hostnames)
 - CA/certificate settings
 
-**Benefits:**
+Benefits:
+
 - Eliminates confusion about where values live
 - Prevents using stale Bolt hiera for operations
 - Clear pointers to control repo for current config
-- Maintains minimal bootstrap capability for disaster recovery
+- Maintains minimal bootstrap capability for disaster
+  recovery
 
-#### 6.3 Update Bolt Puppetfile Comment
+### 6.3 Update Bolt Puppetfile Comment
 
 ```bash
 cat > Puppetfile <<'EOF'
@@ -676,21 +795,25 @@ EOF
 
 Add section about control repo split:
 
-```markdown
+````markdown
 ## Control Repo Architecture
 
 **Separation:**
+
 - `proxtoboltfu/` - Infrastructure provisioning (Tofu, Bolt, operational plans)
 - `puppet-control-repo/` - Configuration management (Puppet code, roles, profiles)
 
 **Control Repo Location:** `<git-repo-url>`
 
 **Deployment:**
+
 Control repo is deployed via Code Manager to PE environments:
+
 - Branch `production` → environment `production`
 - Branch `development` → environment `development`
 
 **Workflow:**
+
 1. Make changes to puppet-control-repo
 2. Commit and push to appropriate branch
 3. Deploy via Code Manager: `puppet-code deploy <environment>`
@@ -703,12 +826,14 @@ Control repo is deployed via Code Manager to PE environments:
 After control repo split, hiera data serves different purposes in each repo:
 
 **proxtoboltfu/data/** (Bootstrap only)
+
 - Used during initial provisioning
 - Minimal values needed to build infrastructure from scratch
 - NOT used for day-2 operations
 - Contains pointers to control repo for operational config
 
 **puppet-control-repo/data/** (Source of truth)
+
 - Used by Puppet agents via Code Manager
 - All operational configuration lives here
 - Updated via git workflow + Code Manager deployment
@@ -725,8 +850,10 @@ $live_config = run_task('proxtoboltfu::get_pe_config', $targets)
 # NOT from Bolt's potentially stale hiera
 # $config = lookup('peadm::config')  # Don't use for operations
 ```
+````
 
 **Control repo is source of truth for:**
+
 - Hostnames and network configuration
 - Application passwords (dashboard, nessus)
 - Console passwords
@@ -736,32 +863,14 @@ $live_config = run_task('proxtoboltfu::get_pe_config', $targets)
 - All ongoing operational configuration
 
 **Bolt hiera contains only:**
+
 - PE license key (for reprovisioning)
 - Initial bootstrap topology
 - Minimal disaster recovery data
 
 See: `docs/control-repo-split.md` for detailed implementation.
-```
 
-#### 6.5 Commit Changes
-
-```bash
-git add -A
-git commit -m "Remove control repo files (moved to puppet-control-repo)
-
-Control repo files now live in separate repository:
-<git-repo-url>
-
-proxtoboltfu now contains only:
-- Infrastructure provisioning (Tofu/Bolt)
-- Bolt plans and tasks
-- Operational hiera data
-
-Maintains clean separation between infrastructure build
-and configuration management"
-
-git push
-```
+````text
 
 ---
 
@@ -770,7 +879,8 @@ git push
 ### File Distribution
 
 **proxtoboltfu/** (Infrastructure provisioning)
-```
+
+```text
 proxtoboltfu/
 ├── tf/                    # OpenTofu VM provisioning
 ├── plans/                 # Bolt orchestration plans
@@ -781,10 +891,11 @@ proxtoboltfu/
 ├── Puppetfile             # Bolt modules only (.modules/)
 ├── inventory.yaml         # Dynamic inventory
 └── bolt-project.yaml      # Bolt configuration
-```
+````
 
 **puppet-control-repo/** (Configuration management)
-```
+
+```text
 puppet-control-repo/
 ├── manifests/
 │   └── site.pp            # Node classification
@@ -802,17 +913,20 @@ puppet-control-repo/
 ### Workflow Changes
 
 **Before split:**
-```
+
+```text
 Developer → proxtoboltfu (everything) → Bolt runs → PE applies
 ```
 
 **After split:**
-```
+
+```text
 # Infrastructure changes
 Developer → proxtoboltfu → Tofu/Bolt → Provision infrastructure
 
 # Configuration changes
-Developer → puppet-control-repo → Git push → Code Manager → PE applies
+Developer → puppet-control-repo → Git push → Code Manager →
+PE applies
 ```
 
 ### Benefits
@@ -827,15 +941,20 @@ Developer → puppet-control-repo → Git push → Code Manager → PE applies
 ### Maintenance Notes
 
 **Module updates:**
-- Bolt modules: Edit `proxtoboltfu/Puppetfile`, run `bolt module install`
-- Puppet modules: Edit `puppet-control-repo/Puppetfile`, push, run `puppet-code deploy`
+
+- Bolt modules: Edit `proxtoboltfu/Puppetfile`, run
+  `bolt module install`
+- Puppet modules: Edit `puppet-control-repo/Puppetfile`, push, run
+  `puppet-code deploy`
 
 **Profile changes:**
+
 - Edit in `puppet-control-repo/site-modules/profile/`
 - Commit, push, deploy via Code Manager
 - Test in development environment first
 
 **Infrastructure changes:**
+
 - Edit Terraform or Bolt plans in `proxtoboltfu/`
 - Run `tofu apply` or `bolt plan run` as needed
 - Does not affect control repo
@@ -846,18 +965,24 @@ Developer → puppet-control-repo → Git push → Code Manager → PE applies
 
 ### The Challenge
 
-After the split, some configuration values are conceptually shared between repos:
+After the split, some configuration values are conceptually shared
+between repos:
+
 - Hostnames (used in both bootstrap and ongoing operations)
 - Credentials (initially set during build, rotated during operations)
 - Version numbers (recorded at build, updated during upgrades)
 
-**Risk:** Values drift over time as control repo is updated but Bolt's bootstrap hiera becomes stale.
+**Risk:** Values drift over time as control repo is updated but
+Bolt's bootstrap hiera becomes stale.
 
-**Impact:** 6 months later, you run an upgrade plan and it uses outdated credentials/hostnames from Bolt hiera → operation fails.
+**Impact:** 6 months later, you run an upgrade plan and it uses
+outdated credentials/hostnames from Bolt hiera → operation fails.
 
 ### Solution: Pull from Running Infrastructure
 
-**Strategy:** Bolt day-2 operations read configuration from the running infrastructure (which uses control repo as source of truth), NOT from Bolt's hiera.
+**Strategy:** Bolt day-2 operations read configuration from the
+running infrastructure (which uses control repo as source of truth),
+NOT from Bolt's hiera.
 
 ### 7.1 Create Configuration Extraction Task
 
@@ -865,14 +990,19 @@ After the split, some configuration values are conceptually shared between repos
 # tasks/get_pe_config.sh
 #!/bin/bash
 # Extract current PE configuration from running infrastructure
-# This reads the ACTUAL config (from control repo) not stale Bolt hiera
+# This reads the ACTUAL config (from control repo) not stale Bolt
+# hiera
 
 set -e
 
 # Read from Puppet Server's actual configuration
-console_password=$(puppet lookup peadm::config.console_password --render-as s 2>/dev/null || echo "")
-forge_token=$(puppet lookup 'puppet_enterprise::master::code_manager::forge_settings.authorization_token' --render-as s 2>/dev/null || echo "")
-r10k_remote=$(puppet config print r10k_remote --section master 2>/dev/null || echo "")
+console_password=$(puppet lookup peadm::config.console_password \
+  --render-as s 2>/dev/null || echo "")
+forge_token=$(puppet lookup \
+  'puppet_enterprise::master::code_manager::forge_settings.authorization_token' \
+  --render-as s 2>/dev/null || echo "")
+r10k_remote=$(puppet config print r10k_remote --section master \
+  2>/dev/null || echo "")
 
 # Get PE version from running system
 pe_version=$(puppet --version 2>/dev/null || echo "unknown")
@@ -916,42 +1046,51 @@ plan proxtoboltfu::upgrade_pe(
     $config = lookup('peadm::config')
   } else {
     # Primary path: read current state from running system
-    out::message("Reading configuration from running PE infrastructure...")
+    out::message("Reading configuration from running PE
+infrastructure...")
 
-    $live_config_result = run_task('proxtoboltfu::get_pe_config', $targets)
+    $live_config_result = run_task('proxtoboltfu::get_pe_config',
+      $targets)
 
     unless $live_config_result.ok {
-      fail_plan("Failed to read config from running infrastructure. Use use_bolt_hiera=true if PE is unavailable.")
+      fail_plan("Failed to read config from running infrastructure.
+Use use_bolt_hiera=true if PE is unavailable.")
     }
 
     $live_config = $live_config_result.first.value
 
     # Validate we got required values
-    unless $live_config['console_password'] and $live_config['console_password'] != '' {
-      fail_plan("Could not retrieve console password from running infrastructure")
+    unless $live_config['console_password'] and
+      $live_config['console_password'] != '' {
+      fail_plan("Could not retrieve console password from running
+infrastructure")
     }
 
     $config = {
       'version' => $new_version,
       'primary_host' => $targets[0].name,
       'console_password' => $live_config['console_password'],
-      'forge_authorization_token' => $live_config['forge_authorization_token'],
+      'forge_authorization_token' =>
+        $live_config['forge_authorization_token'],
       'r10k_remote' => $live_config['r10k_remote'],
     }
 
     out::message("Using current configuration from control repo")
     out::message("  Console password: [redacted]")
-    out::message("  Forge token: ${live_config['forge_authorization_token'][0,20]}...")
+    out::message("  Forge token:
+${live_config['forge_authorization_token'][0,20]}...")
     out::message("  r10k remote: ${live_config['r10k_remote']}")
   }
 
-  out::message("Upgrading PE from ${live_config['pe_version']} to ${new_version}...")
+  out::message("Upgrading PE from ${live_config['pe_version']} to
+${new_version}...")
 
   run_plan('peadm::upgrade', $config)
 }
 ```
 
 **Apply same pattern to:**
+
 - `plans/upgrade_scm.pp`
 - `plans/upgrade_cd4pe.pp`
 - `plans/add_compiler.pp`
@@ -959,7 +1098,8 @@ plan proxtoboltfu::upgrade_pe(
 
 ### 7.3 Create Optional Snapshot Plan
 
-For disaster recovery preparedness, allow updating Bolt's hiera from current production state:
+For disaster recovery preparedness, allow updating Bolt's hiera from
+current production state:
 
 ```puppet
 # plans/snapshot_current_config.pp
@@ -970,7 +1110,8 @@ plan proxtoboltfu::snapshot_current_config(
 
   unless $confirm {
     fail_plan(@(END))
-      This plan updates Bolt's bootstrap hiera with current production values.
+      This plan updates Bolt's bootstrap hiera with current
+      production values.
 
       Use case: Disaster recovery preparation
       - Keeps Bolt's hiera reasonably current
@@ -983,17 +1124,21 @@ plan proxtoboltfu::snapshot_current_config(
       END
   }
 
-  out::message("Extracting current configuration from running infrastructure...")
+  out::message("Extracting current configuration from running
+infrastructure...")
 
-  $live_config = run_task('proxtoboltfu::get_pe_config', $targets).first.value
+  $live_config = run_task('proxtoboltfu::get_pe_config',
+    $targets).first.value
 
   out::message("Updating Bolt hiera with current values...")
 
-  # Update data/pe.yaml with current values (keeping structure, updating values)
+  # Update data/pe.yaml with current values (keeping structure,
+  # updating values)
   # This is a snapshot for DR purposes, not used by day-2 operations
 
   out::message(@(END))
-    Snapshot complete. Bolt's bootstrap hiera updated with current values.
+    Snapshot complete. Bolt's bootstrap hiera updated with current
+    values.
 
     Updated:
     - PE version
@@ -1005,7 +1150,8 @@ plan proxtoboltfu::snapshot_current_config(
     - Tokens
     - Credentials
 
-    Commit changes: git add data/ && git commit -m "Update bootstrap hiera snapshot"
+    Commit changes: git add data/ && git commit -m "Update bootstrap
+    hiera snapshot"
     END
 }
 ```
@@ -1025,28 +1171,32 @@ plan proxtoboltfu::snapshot_current_config(
 #   PE infrastructure targets (default: puppet-enterprise-nodes)
 #
 # @param use_bolt_hiera
-#   Emergency fallback: use Bolt's hiera instead of reading from infrastructure
-#   Only use if PE is unavailable. Values may be stale.
-#   Default: false (read from running infrastructure)
+#   Emergency fallback: use Bolt's hiera instead of reading from
+#   infrastructure. Only use if PE is unavailable. Values may be
+#   stale. Default: false (read from running infrastructure)
 #
 # @example Upgrade to new version (normal operation)
 #   bolt plan run proxtoboltfu::upgrade_pe new_version=2025.7.0
 #
 # @example Upgrade using stale Bolt hiera (emergency only)
-#   bolt plan run proxtoboltfu::upgrade_pe new_version=2025.7.0 use_bolt_hiera=true
+#   bolt plan run proxtoboltfu::upgrade_pe new_version=2025.7.0
+#   use_bolt_hiera=true
 ```
 
 ### 7.5 Operational Procedures
 
-**Normal day-2 operations:**
+### Normal day-2 operations
+
 ```bash
-# Upgrade PE - reads current config from running infrastructure automatically
+# Upgrade PE - reads current config from running infrastructure
+# automatically
 bolt plan run proxtoboltfu::upgrade_pe new_version=2025.7.0
 
 # No hiera sync needed - plan reads from control repo via running PE
 ```
 
-**Disaster recovery scenario:**
+### Disaster recovery scenario
+
 ```bash
 # If you need to rebuild from scratch and want recent-ish values
 bolt plan run proxtoboltfu::snapshot_current_config confirm=true
@@ -1056,36 +1206,45 @@ git add data/ && git commit -m "Snapshot current config for DR"
 bolt plan run proxtoboltfu::build_environment
 ```
 
-**Emergency fallback (PE unavailable):**
+### Emergency fallback (PE unavailable)
+
 ```bash
 # Only if running infrastructure is unavailable
 # Uses potentially stale Bolt hiera
-bolt plan run proxtoboltfu::upgrade_pe new_version=2025.7.0 use_bolt_hiera=true
+bolt plan run proxtoboltfu::upgrade_pe new_version=2025.7.0 \
+  use_bolt_hiera=true
 ```
 
 ### 7.6 Benefits of This Approach
 
-**1. Eliminates drift as an operational problem**
+### 1. Eliminates drift as an operational problem
+
 - No synchronization required between repos
 - Control repo remains single source of truth
 - Day-2 operations always use current values
 
-**2. Aligns with reality**
+### 2. Aligns with reality
+
 - Credentials rotate in control repo
 - Upgrades automatically pick up rotated credentials
 - No manual sync step to forget
 
-**3. Maintains disaster recovery capability**
+### 3. Maintains disaster recovery capability
+
 - Bolt's bootstrap hiera still exists for reprovisioning
 - Optional snapshot plan for DR preparedness
 - Emergency fallback if infrastructure unavailable
 
-**4. Clear mental model**
-- **Bootstrap:** Bolt hiera → Build infrastructure → Deploy control repo
-- **Operations:** Control repo → Infrastructure → Bolt reads live config
+### 4. Clear mental model
+
+- **Bootstrap:** Bolt hiera → Build infrastructure → Deploy control
+  repo
+- **Operations:** Control repo → Infrastructure → Bolt reads live
+  config
 - **Recovery:** Bolt hiera snapshot → Rebuild infrastructure
 
-**5. Self-documenting**
+### 5. Self-documenting
+
 - Plan parameters make the pattern explicit (`use_bolt_hiera=false`)
 - Comments in Bolt hiera point to control repo
 - Clear operational procedures
@@ -1096,34 +1255,41 @@ bolt plan run proxtoboltfu::upgrade_pe new_version=2025.7.0 use_bolt_hiera=true
 
 ### Key Files and Locations
 
-**proxtoboltfu/** (after split)
-```
-├── control-repo-template/    # Template for bootstrapping new control repos
-├── data/                      # Bootstrap hiera (minimal, with pointers)
-├── plans/                     # Bolt orchestration (reads from live infrastructure)
-├── tasks/get_pe_config.sh     # Extracts config from running PE
-└── Puppetfile                 # Bolt modules only (auto-generated)
+### proxtoboltfu (after split)
+
+```text
+├── control-repo-template/    # Template for bootstrapping new
+                              # control repos
+├── data/                     # Bootstrap hiera (minimal, with
+                              # pointers)
+├── plans/                    # Bolt orchestration (reads from live
+                              # infrastructure)
+├── tasks/get_pe_config.sh    # Extracts config from running PE
+└── Puppetfile                # Bolt modules only (auto-generated)
 ```
 
-**puppet-control-repo/**
-```
+### puppet-control-repo
+
+```text
 ├── data/
-│   ├── roles/                 # Role-based hiera (source of truth)
-│   ├── nodes/                 # Node-specific overrides
-│   └── common.yaml            # Common defaults
-├── manifests/site.pp          # Node classification
-├── site-modules/              # Roles and profiles
-└── Puppetfile                 # Puppet modules for agents
+│   ├── roles/                # Role-based hiera (source of truth)
+│   ├── nodes/                # Node-specific overrides
+│   └── common.yaml           # Common defaults
+├── manifests/site.pp         # Node classification
+├── site-modules/             # Roles and profiles
+└── Puppetfile                # Puppet modules for agents
 ```
 
 ### Common Commands
 
-**Initial deployment:**
+### Initial deployment
+
 ```bash
 bolt plan run proxtoboltfu::build_environment
 ```
 
-**Deploy control repo changes:**
+### Deploy control repo changes
+
 ```bash
 cd puppet-control-repo
 git add . && git commit -m "Update config"
@@ -1131,87 +1297,107 @@ git push
 puppet-code deploy production --wait
 ```
 
-**Upgrade PE (reads from live infrastructure):**
+### Upgrade PE (reads from live infrastructure)
+
 ```bash
 bolt plan run proxtoboltfu::upgrade_pe new_version=2025.7.0
 ```
 
-**Clean bootstrap hiera after deployment:**
+### Clean bootstrap hiera after deployment
+
 ```bash
 bolt plan run proxtoboltfu::cleanup_bootstrap_hiera confirm=true
 ```
 
-**Snapshot current config for DR:**
+### Snapshot current config for DR
+
 ```bash
 bolt plan run proxtoboltfu::snapshot_current_config confirm=true
 ```
 
 ### Data Flow
 
-**Bootstrap (day 0):**
-```
+### Bootstrap (day 0)
+
+```text
 Bolt hiera → Provision → Deploy control repo → PE uses control repo
 ```
 
-**Operations (day 2):**
-```
-Control repo → Code Manager → PE infrastructure → Bolt reads live config → Upgrades
+### Operations (day 2)
+
+```text
+Control repo → Code Manager → PE infrastructure → Bolt reads live
+config → Upgrades
 ```
 
-**Disaster recovery:**
-```
-Bolt hiera snapshot → Rebuild infrastructure → Deploy control repo → Resume operations
+### Disaster recovery
+
+```text
+Bolt hiera snapshot → Rebuild infrastructure → Deploy control repo →
+Resume operations
 ```
 
 ### Hiera Hierarchy
 
-**Control repo (puppet-control-repo/hiera.yaml):**
+### Control repo (puppet-control-repo/hiera.yaml)
+
 1. `data/nodes/{certname}.yaml` (highest priority)
 2. `data/roles/{pp_role}.yaml` (from trusted extension)
 3. `data/common.yaml` (lowest priority)
 
-**Bolt repo (proxtoboltfu/hiera.yaml):**
-Only used for initial provisioning, contains pointers to control repo for operational values.
+### Bolt repo (proxtoboltfu/hiera.yaml)
+
+Only used for initial provisioning, contains pointers to control repo
+for operational values.
 
 ---
 
 ## Validation Checklist
 
-**Phase 1-2: Bootstrap and File Copy**
+### Phase 1-2: Bootstrap and File Copy
+
 - [ ] Control repo cloned from puppetlabs template
 - [ ] Template files copied from proxtoboltfu/control-repo-template/
 - [ ] Role-based hiera structure created (data/roles/, data/nodes/)
 - [ ] Hiera data migrated to role-specific files
 - [ ] Puppetfile created with Puppet module dependencies only
 
-**Phase 3: Git Setup**
+### Phase 3: Git Setup
+
 - [ ] Git repository initialized and pushed to remote
 - [ ] Production branch created and pushed
 - [ ] Development branch created (optional)
 
-**Phase 4: Code Manager**
+### Phase 4: Code Manager
+
 - [ ] Deploy key generated on PE server
 - [ ] Deploy key added to Git repository
-- [ ] Code Manager configured in PE console (r10k_remote, r10k_private_key_file)
+- [ ] Code Manager configured in PE console (r10k_remote,
+      r10k_private_key_file)
 - [ ] RBAC token generated for Code Manager API
 - [ ] `puppet agent -t` run on PE server to apply Code Manager config
 
-**Phase 5: Deployment**
+### Phase 5: Deployment
+
 - [ ] `puppet-code deploy production --wait` runs successfully
-- [ ] Environment directory created: `/etc/puppetlabs/code/environments/production/`
+- [ ] Environment directory created:
+      `/etc/puppetlabs/code/environments/production/`
 - [ ] Modules installed from Puppetfile in environment
 - [ ] Site manifests and site-modules present
 - [ ] Test agent receives catalog with role classification
 - [ ] Agent Puppet run succeeds with role applied
 
-**Phase 6: Cleanup**
-- [ ] Control repo files moved to proxtoboltfu/control-repo-template/
+### Phase 6: Cleanup
+
+- [ ] Control repo files moved to
+      proxtoboltfu/control-repo-template/
 - [ ] Bootstrap hiera cleaned (`cleanup_bootstrap_hiera` plan run)
 - [ ] Bolt hiera files contain only bootstrap values with pointers
 - [ ] CLAUDE.md updated with control repo architecture
 - [ ] Changes committed to proxtoboltfu
 
-**Phase 7: Day 2 Operations**
+### Phase 7: Day 2 Operations
+
 - [ ] `tasks/get_pe_config.sh` created and tested
 - [ ] Upgrade plans updated to read from live infrastructure
 - [ ] Optional snapshot plan created
@@ -1225,11 +1411,13 @@ Only used for initial provisioning, contains pointers to control repo for operat
 If issues occur:
 
 1. **Control repo deployment fails:**
+
    - Check Code Manager logs: `/var/log/puppetlabs/puppetserver/code-manager.log`
    - Verify deploy key permissions
    - Test Git connectivity: `sudo -u pe-puppet git ls-remote <repo-url>`
 
 2. **Agent catalogs fail to compile:**
+
    - Check Puppet Server logs: `/var/log/puppetlabs/puppetserver/puppetserver.log`
    - Verify module dependencies in Puppetfile
    - Test catalog compilation: `puppet catalog compile <node-name>`
@@ -1245,7 +1433,8 @@ If issues occur:
 
 **After successful split:**
 
-1. **Webhook deployment:** Configure Git webhooks to trigger Code Manager deployments automatically
+1. **Webhook deployment:** Configure Git webhooks to trigger Code
+   Manager deployments automatically
 2. **CD4PE integration:** Use CD4PE for testing and deployment pipelines
 3. **Branch protection:** Require PR reviews before merging to production
 4. **Automated testing:** Add rspec-puppet tests for roles and profiles

@@ -16,7 +16,7 @@ plan proxtoboltfu::generate_templates (
 
   # Phase 1: Create templates on Proxmox
   out::message("📦 Phase 1: Creating VM templates on Proxmox...")
-  
+
   # Validate prerequisites
   out::message("✅ Validating prerequisites...")
 
@@ -25,7 +25,7 @@ plan proxtoboltfu::generate_templates (
   unless file::exists("${project_root}/config/templates.csv") {
     fail("Templates configuration file not found: ${project_root}/config/templates.csv")
   }
-  
+
   unless file::exists("${project_root}/.scripts/template-generate.sh") {
     fail("Template generation script not found: ${project_root}/.scripts/template-generate.sh")
   }
@@ -47,16 +47,16 @@ plan proxtoboltfu::generate_templates (
     # Create proper directory structure
     mkdir -p /root/templates
     cd /root/templates
-    
+
     # Copy the CSV file to the expected location
     cp /tmp/templates.csv ./templates.csv
-    
+
     # Create config file if it doesn't exist
     if [ ! -f ./config ]; then
       echo "changeme" > ./config
       echo "Created default config file with password 'changeme'"
     fi
-    
+
     # Verify setup
     echo "Working directory setup:"
     pwd
@@ -71,7 +71,7 @@ plan proxtoboltfu::generate_templates (
   # Upload the script to the working directory
   out::message("📤 Uploading script to working directory...")
   upload_file("${project_root}/.scripts/template-generate.sh", '/root/templates/template-generate.sh', '192.168.5.10')
-  
+
   # Make it executable
   run_command('chmod +x /root/templates/template-generate.sh', '192.168.5.10')
 
@@ -85,7 +85,7 @@ plan proxtoboltfu::generate_templates (
   # Run the template generation script from the proper working directory
   out::message("🚀 Running template generation script...")
   $generation_result = run_command(
-    'cd /root/templates && ./template-generate.sh', 
+    'cd /root/templates && ./template-generate.sh',
     '192.168.5.10',
     '_env_vars' => $script_env_updated,
     '_catch_errors' => true
@@ -117,7 +117,7 @@ plan proxtoboltfu::generate_templates (
   unless $templates_only {
     out::message("")
     out::message("📄 Phase 2: Generating Terraform files locally...")
-    
+
     # Query Proxmox to get actual created template IDs and names
     out::message("🔍 Querying Proxmox for created templates...")
     $template_query = run_command(
@@ -125,18 +125,18 @@ plan proxtoboltfu::generate_templates (
       '192.168.5.10',
       '_catch_errors' => true
     )
-    
+
     if $template_query.ok {
       $template_data = $template_query.first.value['stdout']
       out::message("Found templates: ${template_data}")
-      
+
       # Generate Terraform files based on actual templates that exist
       out::message("📝 Generating Terraform configuration files...")
       run_plan('proxtoboltfu::generate_terraform_files_simple',
         'template_data' => $template_data,
         'storage' => $storage
       )
-      
+
       out::message("✅ Terraform files generated successfully")
     } else {
       out::message("⚠️  Could not query templates from Proxmox, skipping Terraform generation")
@@ -145,15 +145,15 @@ plan proxtoboltfu::generate_templates (
 
   out::message("")
   out::message("🎯 Template generation process completed")
-  
+
   $final_status = $templates_only ? {
     true  => 'templates_created',
     false => 'completed_with_terraform'
   }
 
-  return { 
-    status => $final_status, 
+  return {
+    status => $final_status,
     storage => $storage,
-    templates_only => $templates_only 
+    templates_only => $templates_only
   }
 }

@@ -1,14 +1,14 @@
-<p align="center">
-  <img src="images/proxtoboltfu.svg" alt="proxtoboltfu logo" width="400">
-</p>
+# proxtoboltfu
 
-# proxtoboltfu - Puppet Infrastructure Automation
+## Puppet Infrastructure Automation
 
-Automated provisioning and configuration of Puppet Enterprise infrastructure on Proxmox using OpenTofu and Puppet Bolt.
+Automated provisioning and configuration of Puppet Enterprise
+infrastructure on Proxmox using OpenTofu and Puppet Bolt.
 
 ## Overview
 
 This project provides a complete infrastructure-as-code solution for deploying:
+
 - **Puppet Enterprise** (PE) server
 - **SCM/Comply** server for compliance management
 - **CD4PE** server for continuous delivery
@@ -18,18 +18,23 @@ This project provides a complete infrastructure-as-code solution for deploying:
 - **Dynamic inventory** from Terraform state
 - **Automatic DNS** registration via Pihole
 
-The architecture separates infrastructure provisioning (OpenTofu) from configuration management (Bolt) for clean, repeatable deployments.
+The architecture separates infrastructure provisioning (OpenTofu)
+from configuration management (Bolt) for clean, repeatable
+deployments.
 
 ## Prerequisites
 
 ### Required Tools
 
 - OpenTofu >= 1.10.0 (or Terraform)
-- [Puppet Bolt](https://help.puppet.com/bolt/current/topics/bolt_installing.htm) >= 3.0
+- [Puppet Bolt][bolt-install] >= 3.0
 - Puppet Enterprise installer (downloaded separately)
 - Git for version control
 
+[bolt-install]: https://help.puppet.com/bolt/current/topics/bolt_installing.htm
+
 Install tools:
+
 ```bash
 # macOS with Homebrew
 brew install opentofu puppet-bolt
@@ -65,13 +70,15 @@ Create encryption keys for sensitive hiera data:
 
 ```bash
 mkdir -p keys
-eyaml createkeys --pkcs7-private-key=keys/private_key.pkcs7.pem \
-                 --pkcs7-public-key=keys/public_key.pkcs7.pem
+eyaml createkeys \
+  --pkcs7-private-key=keys/private_key.pkcs7.pem \
+  --pkcs7-public-key=keys/public_key.pkcs7.pem
 chmod 600 keys/private_key.pkcs7.pem
 chmod 644 keys/public_key.pkcs7.pem
 ```
 
-**Important:** Keep `private_key.pkcs7.pem` secure. Never commit it to version control.
+**Important:** Keep `private_key.pkcs7.pem` secure.
+Never commit it to version control.
 
 ### 3. Configure Terraform Variables
 
@@ -79,8 +86,8 @@ Create `tf/terraform.tfvars` with your environment-specific values:
 
 ```hcl
 # Proxmox Configuration
-api_url              = "https://proxmox.yourdomain.com:8006/api2/json"
-proxmox_token_id     = "terraform@pam!terraform"
+api_url = "https://proxmox.yourdomain.com:8006/api2/json"
+proxmox_token_id = "terraform@pam!terraform"
 proxmox_token_secret = "your-proxmox-token-secret"
 
 # Infrastructure Toggles
@@ -106,9 +113,9 @@ prod_clients = 1  # Number of clients per OS in production
 dev_clients  = 0  # Number of clients per OS in development
 
 # VM Defaults
-ciuser     = "yourusername"
+ciuser = "yourusername"
 cipassword = "your-cloud-init-password"
-sshkey     = "ssh-ed25519 AAAAC3... your-public-key"
+sshkey = "ssh-ed25519 AAAAC3... your-public-key"
 
 # Pihole Configuration
 pihole_password = "your-pihole-admin-password"
@@ -119,12 +126,14 @@ console_password = "your-pe-console-password"
 
 # Optional: Customize defaults
 storage_location = "ceph"
-disk_size       = "37G"
-cores           = 2
-memory          = 1536
+disk_size = "37G"
+cores = 2
+memory = 1536
 ```
 
-**Security Note:** This file contains secrets. Add to `.gitignore`:
+**Security Note:** This file contains secrets.
+Add to `.gitignore`:
+
 ```bash
 echo "tf/terraform.tfvars" >> .gitignore
 ```
@@ -139,8 +148,9 @@ Edit `data/common.yaml` with your infrastructure details:
 peadm::config:
   primary_host: new-puppet.yourdomain.com
   console_password: >
-    ENC[PKCS7,...]  # Encrypt with: eyaml encrypt -s 'password'
-  version: '2023.8.0'
+    # Encrypt with: eyaml encrypt -s 'password'
+    ENC[PKCS7,...]
+  version: "2023.8.0"
   # ... additional PE config
 
 # SCM Configuration
@@ -165,6 +175,7 @@ cd4peadm::csr_attributes:
 ```
 
 **Encrypt Sensitive Values:**
+
 ```bash
 eyaml encrypt -s 'your-sensitive-value' \
   --pkcs7-private-key=keys/private_key.pkcs7.pem \
@@ -183,8 +194,10 @@ version: 2
 config:
   transport: ssh
   ssh:
-    private-key: ~/.ssh/id_ed25519  # Update if using different key
-    user: yourusername               # Match ciuser from terraform.tfvars
+    # Update if using different key
+    private-key: ~/.ssh/id_ed25519
+    # Match ciuser from terraform.tfvars
+    user: yourusername
     run-as: root
     host-key-check: false
     tmpdir: /var/tmp
@@ -217,16 +230,20 @@ bolt plan run proxtoboltfu::build_environment
 ```
 
 This orchestrates the complete deployment:
+
 1. Provisions infrastructure with OpenTofu (VMs + DNS)
 2. Builds Puppet Enterprise server
-3. Builds additional infrastructure (SCM, CD4PE, Dashboard, Nessus) in parallel
+3. Builds additional infrastructure (SCM, CD4PE, Dashboard,
+   Nessus) in parallel
 4. Builds agent nodes if any exist
 
 **Expected time:** 30-45 minutes
 
 To skip infrastructure provisioning (if VMs already exist):
+
 ```bash
-bolt plan run proxtoboltfu::build_environment apply_terraform=false
+bolt plan run proxtoboltfu::build_environment \
+  apply_terraform=false
 ```
 
 ### Manual Step-by-Step Deployment
@@ -253,7 +270,8 @@ This creates VMs and DNS records for enabled infrastructure.
 bolt plan run proxtoboltfu::build_pe
 ```
 
-This installs and configures PE, deploys code, and installs eyaml keys.
+This installs and configures PE, deploys code, and installs
+eyaml keys.
 
 **Expected time:** 20-30 minutes
 
@@ -276,16 +294,19 @@ bolt plan run proxtoboltfu::build_nessus
 bolt plan run proxtoboltfu::build_agents
 ```
 
-**Expected time:** Varies by agent count (1-2 minutes per agent)
+**Expected time:** Varies by agent count
+(1-2 minutes per agent)
 
 ### Managing Agent Clients
 
 **Deploy Clients:**
+
 1. Configure client counts in `tf/terraform.tfvars`
 2. Apply infrastructure: `cd tf && tofu apply && cd ..`
 3. Configure agents: `bolt plan run proxtoboltfu::build_agents`
 
 **Destroy Clients:**
+
 ```bash
 # Preview what will be destroyed
 bolt plan run proxtoboltfu::destroy_clients
@@ -294,7 +315,8 @@ bolt plan run proxtoboltfu::destroy_clients
 bolt plan run proxtoboltfu::destroy_clients confirm=true
 ```
 
-The destroy process automatically purges agent certificates from Puppet Enterprise before destroying VMs.
+The destroy process automatically purges agent certificates from
+Puppet Enterprise before destroying VMs.
 
 ### Verification
 
@@ -314,37 +336,41 @@ open https://new-puppet.yourdomain.com
 
 ### Terraform Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `api_url` | Yes | - | Proxmox API URL |
-| `proxmox_token_id` | Yes | - | Proxmox API token ID |
-| `proxmox_token_secret` | Yes | - | Proxmox API token secret |
-| `puppet_pe` | No | false | Deploy Puppet Enterprise |
-| `puppet_scm` | No | false | Deploy SCM/Comply |
-| `puppet_cd4pe` | No | false | Deploy CD4PE |
-| `puppet_dashboard` | No | false | Deploy Dashboard |
-| `nessus` | No | false | Deploy Nessus |
-| `enable_alma` | No | false | Enable Alma Linux clients |
-| `enable_centos` | No | false | Enable CentOS clients |
-| `enable_debian` | No | false | Enable Debian clients |
-| `enable_oracle` | No | false | Enable Oracle Linux clients |
-| `enable_redhat` | No | false | Enable RHEL clients |
-| `enable_rocky` | No | false | Enable Rocky Linux clients |
-| `enable_ubuntu` | No | false | Enable Ubuntu clients |
-| `enable_opensuse` | No | false | Enable OpenSUSE clients |
-| `enable_amazonlinux` | No | false | Enable Amazon Linux clients |
-| `prod_clients` | No | 0 | Number of clients per OS in production |
-| `dev_clients` | No | 0 | Number of clients per OS in development |
-| `ciuser` | Yes | - | Cloud-init default user |
-| `cipassword` | Yes | - | Cloud-init default password |
-| `sshkey` | Yes | - | SSH public key for access |
-| `pihole_password` | Yes | - | Pihole admin password |
-| `domain` | No | `albatrossflavour.com` | Base domain |
-| `console_password` | Yes | - | PE console admin password |
-| `storage_location` | No | `ceph` | Proxmox storage pool |
-| `disk_size` | No | `37G` | VM disk size |
-| `cores` | No | 2 | VM CPU cores |
-| `memory` | No | 1536 | VM RAM (MB) |
+<!-- markdownlint-disable MD013 -->
+
+| Variable               | Required | Default                | Description              |
+| ---------------------- | -------- | ---------------------- | ------------------------ |
+| `api_url`              | Yes      | -                      | Proxmox API URL          |
+| `proxmox_token_id`     | Yes      | -                      | Proxmox API token ID     |
+| `proxmox_token_secret` | Yes      | -                      | Proxmox token secret     |
+| `puppet_pe`            | No       | false                  | Deploy Puppet Enterprise |
+| `puppet_scm`           | No       | false                  | Deploy SCM/Comply        |
+| `puppet_cd4pe`         | No       | false                  | Deploy CD4PE             |
+| `puppet_dashboard`     | No       | false                  | Deploy Dashboard         |
+| `nessus`               | No       | false                  | Deploy Nessus            |
+| `enable_alma`          | No       | false                  | Enable Alma Linux        |
+| `enable_centos`        | No       | false                  | Enable CentOS            |
+| `enable_debian`        | No       | false                  | Enable Debian            |
+| `enable_oracle`        | No       | false                  | Enable Oracle Linux      |
+| `enable_redhat`        | No       | false                  | Enable RHEL              |
+| `enable_rocky`         | No       | false                  | Enable Rocky Linux       |
+| `enable_ubuntu`        | No       | false                  | Enable Ubuntu            |
+| `enable_opensuse`      | No       | false                  | Enable OpenSUSE          |
+| `enable_amazonlinux`   | No       | false                  | Enable Amazon Linux      |
+| `prod_clients`         | No       | 0                      | Clients per OS (prod)    |
+| `dev_clients`          | No       | 0                      | Clients per OS (dev)     |
+| `ciuser`               | Yes      | -                      | Cloud-init user          |
+| `cipassword`           | Yes      | -                      | Cloud-init password      |
+| `sshkey`               | Yes      | -                      | SSH public key           |
+| `pihole_password`      | Yes      | -                      | Pihole admin password    |
+| `domain`               | No       | `albatrossflavour.com` | Base domain              |
+| `console_password`     | Yes      | -                      | PE console password      |
+| `storage_location`     | No       | `ceph`                 | Proxmox storage pool     |
+| `disk_size`            | No       | `37G`                  | VM disk size             |
+| `cores`                | No       | 2                      | VM CPU cores             |
+| `memory`               | No       | 1536                   | VM RAM (MB)              |
+
+<!-- markdownlint-enable MD013 -->
 
 ### Hiera Configuration Keys
 
@@ -352,58 +378,68 @@ open https://new-puppet.yourdomain.com
 
 ```yaml
 peadm::config:
-  primary_host: <fqdn>          # PE server hostname
-  console_password: <encrypted> # PE console admin password
-  version: <version>            # PE version to install
+  # PE server hostname
+  primary_host: <fqdn>
+  # PE console admin password
+  console_password: <encrypted>
+  # PE version to install
+  version: <version>
 
 complyadm::config:
-  resolvable_hostname: <fqdn>   # SCM server hostname
+  # SCM server hostname
+  resolvable_hostname: <fqdn>
 
 cd4peadm::config:
-  resolvable_hostname: <fqdn>   # CD4PE server hostname
+  # CD4PE server hostname
+  resolvable_hostname: <fqdn>
 ```
 
 See module documentation for additional configuration options:
+
 - [peadm](https://forge.puppet.com/modules/puppetlabs/peadm)
 - [cd4peadm](https://forge.puppet.com/modules/puppetlabs/cd4peadm)
 - [complyadm](https://forge.puppet.com/modules/puppetlabs/complyadm)
 
 ### VM Specifications
 
-| Server | VMID | vCPU | RAM | Disk | OS |
-|--------|------|------|-----|------|-----|
-| PE Primary | 999 | 12 (3x4) | 16GB | 100GB | Ubuntu 24.04 |
-| SCM | 998 | 8 (2x4) | 8GB | 50GB | Ubuntu 22.04 |
-| CD4PE | 997 | 8 (2x4) | 8GB | 50GB | Ubuntu 24.04 |
-| Dashboard | 996 | 4 (2x2) | 4GB | 50GB | Ubuntu 22.04 |
-| Nessus | 995 | 4 (2x2) | 4GB | 50GB | Ubuntu 22.04 |
-| Agents | 1xxx-9xxxx | 2 (1x2) | 1.5GB | 37GB | Varies |
+| Server     | VMID       | vCPU     | RAM   | Disk  | OS           |
+| ---------- | ---------- | -------- | ----- | ----- | ------------ |
+| PE Primary | 999        | 12 (3x4) | 16GB  | 100GB | Ubuntu 24.04 |
+| SCM        | 998        | 8 (2x4)  | 8GB   | 50GB  | Ubuntu 22.04 |
+| CD4PE      | 997        | 8 (2x4)  | 8GB   | 50GB  | Ubuntu 24.04 |
+| Dashboard  | 996        | 4 (2x2)  | 4GB   | 50GB  | Ubuntu 22.04 |
+| Nessus     | 995        | 4 (2x2)  | 4GB   | 50GB  | Ubuntu 22.04 |
+| Agents     | 1xxx-9xxxx | 2 (1x2)  | 1.5GB | 37GB  | Varies       |
 
-Agent VMs are created dynamically based on enabled OS distributions and client counts.
+Agent VMs are created dynamically based on enabled OS
+distributions and client counts.
 
 ### Tags
 
 Infrastructure uses tags for dynamic inventory grouping:
 
-| Tag | Purpose | Example Use |
-|-----|---------|-------------|
-| `puppetinfra` | All infrastructure | Broad maintenance tasks |
-| `puppet` | PE servers | PE-specific operations |
-| `scm` | SCM servers | Compliance tasks |
-| `cd4pe` | CD4PE servers | Pipeline management |
-| `dashboard` | Dashboard servers | Visualization tasks |
-| `nessus` | Nessus scanners | Security scanning |
-| `puppetagents` | Agent nodes | Agent deployment |
+| Tag            | Purpose            | Example Use       |
+| -------------- | ------------------ | ----------------- |
+| `puppetinfra`  | All infrastructure | Broad maintenance |
+| `puppet`       | PE servers         | PE operations     |
+| `scm`          | SCM servers        | Compliance        |
+| `cd4pe`        | CD4PE servers      | Pipeline mgmt     |
+| `dashboard`    | Dashboard servers  | Visualization     |
+| `nessus`       | Nessus scanners    | Security scan     |
+| `puppetagents` | Agent nodes        | Agent deploy      |
 
-Add new tags by editing `tags` in Terraform resources, then create inventory groups in `inventory.yaml`.
+Add new tags by editing `tags` in Terraform resources, then
+create inventory groups in `inventory.yaml`.
 
 ## Management Tasks
 
 ### Add Agent Nodes
 
-Agent nodes are managed via `tf/clients.tf` which uses dynamic configuration:
+Agent nodes are managed via `tf/clients.tf` which uses dynamic
+configuration:
 
 1. **Enable OS distributions** in `tf/terraform.tfvars`:
+
    ```hcl
    enable_ubuntu = true
    enable_rocky  = true
@@ -412,23 +448,29 @@ Agent nodes are managed via `tf/clients.tf` which uses dynamic configuration:
    ```
 
 2. **Apply Terraform:**
+
    ```bash
    cd tf && tofu apply
    ```
 
 3. **Deploy agents:**
+
    ```bash
    bolt plan run proxtoboltfu::build_agents
    ```
 
-This creates agents for each enabled OS version in both environments. For example, with the above config:
-- Ubuntu: 20.04, 22.04, 24.04 (3 versions × 3 clients = 9 agents)
+This creates agents for each enabled OS version in both
+environments. For example, with the above config:
+
+- Ubuntu: 20.04, 22.04, 24.04 (3 versions × 3 clients =
+  9 agents)
 - Rocky: 8, 9 (2 versions × 3 clients = 6 agents)
 - **Total: 15 agents**
 
 ### Destroy Infrastructure
 
 **Destroy Agent Clients Only:**
+
 ```bash
 # Preview what will be destroyed
 bolt plan run proxtoboltfu::destroy_clients
@@ -461,6 +503,7 @@ tofu apply
 ```
 
 Re-run Bolt plans if configuration changed:
+
 ```bash
 bolt plan run proxtoboltfu::build_pe
 ```
@@ -468,15 +511,18 @@ bolt plan run proxtoboltfu::build_pe
 ### Troubleshooting
 
 **Inventory not showing targets:**
+
 ```bash
 # Test inventory task directly
 PT_dir=tf ./tasks/tofu_inventory.sh
 
 # Check specific tag filter
-PT_dir=tf PT_tag_filter=puppet ./tasks/tofu_inventory.sh
+PT_dir=tf PT_tag_filter=puppet \
+  ./tasks/tofu_inventory.sh
 ```
 
 **DNS not resolving:**
+
 ```bash
 # Test DNS resolution
 dig new-puppet.yourdomain.com
@@ -486,15 +532,19 @@ curl -X GET "http://pihole.yourdomain.com/api/dns"
 ```
 
 **Plans fail with connection errors:**
+
 ```bash
 # Test SSH manually
-ssh -i ~/.ssh/id_ed25519 yourusername@192.168.7.100
+ssh -i ~/.ssh/id_ed25519 \
+  yourusername@192.168.7.100
 
 # Check inventory configuration
-bolt inventory show --detail --targets new-puppet.yourdomain.com
+bolt inventory show --detail \
+  --targets new-puppet.yourdomain.com
 ```
 
 **Eyaml decryption fails:**
+
 ```bash
 # Verify keys exist and have correct permissions
 ls -la keys/
@@ -507,7 +557,9 @@ eyaml decrypt -f data/common.yaml
 
 ## Architecture
 
-See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation, including:
+See [CLAUDE.md](CLAUDE.md) for detailed architecture
+documentation, including:
+
 - Design decisions and rationale
 - Tag-based inventory system
 - Dynamic inventory implementation
@@ -519,17 +571,20 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture documentation, including:
 ### Sensitive Data
 
 **Never commit:**
+
 - `tf/terraform.tfvars` (contains secrets)
 - `keys/private_key.pkcs7.pem` (eyaml private key)
 - Any files with unencrypted passwords
 
 **Always encrypt in hiera:**
+
 - Passwords
 - API tokens
 - License keys
 - Private keys
 
 **Use appropriate permissions:**
+
 ```bash
 chmod 600 keys/private_key.pkcs7.pem
 chmod 600 tf/terraform.tfvars
@@ -566,7 +621,12 @@ This is a personal infrastructure project. If adapting for your use:
 ## Support
 
 For issues specific to:
-- **Proxmox:** See [Proxmox VE Documentation](https://pve.proxmox.com/pve-docs/)
-- **Puppet Enterprise:** See [PE Documentation](https://puppet.com/docs/pe/)
-- **Bolt:** See [Bolt Documentation](https://puppet.com/docs/bolt/)
+
+- **Proxmox:** See [Proxmox VE Documentation][proxmox-docs]
+- **Puppet Enterprise:** See [PE Documentation][pe-docs]
+- **Bolt:** See [Bolt Documentation][bolt-docs]
 - **This Project:** See [CLAUDE.md](CLAUDE.md) or open an issue
+
+[proxmox-docs]: https://pve.proxmox.com/pve-docs/
+[pe-docs]: https://puppet.com/docs/pe/
+[bolt-docs]: https://puppet.com/docs/bolt/

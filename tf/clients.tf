@@ -441,10 +441,10 @@ locals {
 resource "proxmox_vm_qemu" "puppet_clients" {
   for_each = local.puppet_clients_map
 
-  target_nodes = ["ankh", "morpork", "stolat"]
-  vmid         = each.value.vmid
-  tags         = "puppetagents;${each.value.config.environment};${each.value.config.tag_suffix}"
-  description  = "${title(each.value.config.os_family)} ${each.value.config.version} ${each.value.config.environment} puppet nodes"
+  target_nodes           = ["ankh", "morpork", "stolat"]
+  vmid                   = each.value.vmid
+  tags                   = "puppetagents;${each.value.config.environment};${each.value.config.tag_suffix}"
+  description            = "${title(each.value.config.os_family)} ${each.value.config.version} ${each.value.config.environment} puppet nodes"
   onboot                 = false
   agent                  = 1
   qemu_os                = "l26"
@@ -462,16 +462,16 @@ resource "proxmox_vm_qemu" "puppet_clients" {
     numa    = true
   }
 
-  memory          = var.memory
-  name            = "${each.value.config.os_family}-${each.value.config.version}-puppet-${each.value.config.environment}-${each.value.instance_num}.${var.domain}"
-  bootdisk        = "scsi0"
-  scsihw          = "virtio-scsi-single"
-  ipconfig0       = "ip=${each.value.ip_address}/24,gw=192.168.10.1"
-  nameserver      = "192.168.9.2 192.168.9.3"
-  ciuser          = var.ciuser
-  cipassword      = var.cipassword
-  sshkeys         = var.sshkey
-  depends_on      = [proxmox_vm_qemu.new-puppet-server[0]]
+  memory     = var.memory
+  name       = "${each.value.config.os_family}-${each.value.config.version}-puppet-${each.value.config.environment}-${each.value.instance_num}.${var.domain}"
+  bootdisk   = "scsi0"
+  scsihw     = "virtio-scsi-single"
+  ipconfig0  = "ip=${each.value.ip_address}/24,gw=192.168.10.1"
+  nameserver = "192.168.9.2 192.168.9.3"
+  ciuser     = var.ciuser
+  cipassword = var.cipassword
+  sshkeys    = var.sshkey
+  depends_on = [proxmox_vm_qemu.new-puppet-server[0]]
 
   network {
     id     = 0

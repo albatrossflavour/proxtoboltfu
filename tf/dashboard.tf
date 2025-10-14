@@ -1,10 +1,10 @@
 resource "proxmox_vm_qemu" "dashboard-server" {
-  count                  = var.puppet_dashboard ? 1 : 0
-  vmid                   = "996"
-  target_nodes           = ["ankh", "morpork"]
-  tags                   = "puppetinfra;dashboard;prod;ubuntu"
-  description            = "Dashboard server"
-  onboot                 = true
+  count        = var.puppet_dashboard ? 1 : 0
+  vmid         = "996"
+  target_nodes = ["ankh", "morpork"]
+  tags         = "puppetinfra;dashboard;prod;ubuntu"
+  description  = "Dashboard server"
+  onboot       = true
   #hastate                = "started"
   agent                  = 1
   qemu_os                = "l26"
@@ -20,8 +20,8 @@ resource "proxmox_vm_qemu" "dashboard-server" {
     sockets = 2
     numa    = false
   }
-  memory     = 4096
-  name       = "new-dashboard.${var.domain}"
+  memory = 4096
+  name   = "new-dashboard.${var.domain}"
   #protection = true
   bootdisk   = "scsi0"
   scsihw     = "virtio-scsi-single"

@@ -14,7 +14,7 @@ plan proxtoboltfu::generate_terraform_files_simple (
   $terraform_content = @("TERRAFORM_FILE")
     # Generated automatically by proxtoboltfu::generate_terraform_files_simple
     # DO NOT EDIT MANUALLY - this file is regenerated when templates change
-    
+
     locals {
       # VM template IDs from Proxmox
       # Update these based on actual template creation results
@@ -22,7 +22,7 @@ plan proxtoboltfu::generate_terraform_files_simple (
         alma8 = {
           template_id   = 11101
           template_name = "template-Alma-8"
-          os_family     = "alma" 
+          os_family     = "alma"
           os_version    = "8"
           storage       = "${storage}"
         }
@@ -30,16 +30,16 @@ plan proxtoboltfu::generate_terraform_files_simple (
           template_id   = 12401
           template_name = "template-Ubuntu-2404"
           os_family     = "ubuntu"
-          os_version    = "2404" 
+          os_version    = "2404"
           storage       = "${storage}"
         }
       }
-      
+
       # Helper maps for easier reference
       template_ids = {
         for k, v in local.vm_templates : k => v.template_id
       }
-      
+
       template_names = {
         for k, v in local.vm_templates : k => v.template_name
       }
@@ -48,13 +48,13 @@ plan proxtoboltfu::generate_terraform_files_simple (
 
   # Write the generated Terraform file
   $terraform_file = 'tf/generated_templates.tf'
-  
+
   out::message("💾 Writing Terraform configuration to ${terraform_file}")
   file::write($terraform_file, $terraform_content)
 
   out::message("✅ Simple Terraform template file generated successfully")
 
-  return { 
+  return {
     status => 'completed',
     terraform_file => $terraform_file
   }
