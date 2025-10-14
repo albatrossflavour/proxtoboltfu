@@ -23,13 +23,14 @@ resource "proxmox_vm_qemu" "dashboard-server" {
   memory = 4096
   name   = "new-dashboard.${var.domain}"
   #protection = true
-  bootdisk   = "scsi0"
-  scsihw     = "virtio-scsi-single"
-  ipconfig0  = "ip=192.168.10.103/24,gw=192.168.10.1"
-  nameserver = "192.168.9.2 192.168.9.3"
-  ciuser     = var.ciuser
-  cipassword = var.cipassword
-  sshkeys    = var.sshkey
+  bootdisk     = "scsi0"
+  scsihw       = "virtio-scsi-single"
+  ipconfig0    = "ip=192.168.10.103/24,gw=192.168.10.1"
+  nameserver   = "192.168.9.2 192.168.9.3"
+  searchdomain = var.domain
+  ciuser       = var.ciuser
+  cipassword   = var.cipassword
+  sshkeys      = var.sshkey
 
   network {
     id     = 0

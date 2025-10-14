@@ -11,7 +11,7 @@ plan proxtoboltfu::build_environment (
   if $apply_terraform {
     out::message("Step 1: Provisioning infrastructure with OpenTofu...")
     $tofu_result = run_command(
-      'cd tf && tofu apply -auto-approve',
+      'cd tf && tofu apply -auto-approve -parallelism=1',
       'localhost',
       '_run_as' => system::env('USER'),
       '_catch_errors' => true

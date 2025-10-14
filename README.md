@@ -256,11 +256,12 @@ If you prefer manual control:
 cd tf
 tofu init
 tofu plan   # Review what will be created
-tofu apply
+tofu apply -parallelism=1
 cd ..
 ```
 
 This creates VMs and DNS records for enabled infrastructure.
+Serial execution (`-parallelism=1`) prevents Pihole API exhaustion.
 
 **Expected time:** 2-3 minutes
 
@@ -302,7 +303,7 @@ bolt plan run proxtoboltfu::build_agents
 **Deploy Clients:**
 
 1. Configure client counts in `tf/terraform.tfvars`
-2. Apply infrastructure: `cd tf && tofu apply && cd ..`
+2. Apply infrastructure: `cd tf && tofu apply -parallelism=1 && cd ..`
 3. Configure agents: `bolt plan run proxtoboltfu::build_agents`
 
 **Destroy Clients:**
@@ -450,7 +451,7 @@ configuration:
 2. **Apply Terraform:**
 
    ```bash
-   cd tf && tofu apply
+   cd tf && tofu apply -parallelism=1
    ```
 
 3. **Deploy agents:**
@@ -499,7 +500,7 @@ Modify Terraform files, then:
 ```bash
 cd tf
 tofu plan   # Review changes
-tofu apply
+tofu apply -parallelism=1
 ```
 
 Re-run Bolt plans if configuration changed:

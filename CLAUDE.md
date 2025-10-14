@@ -198,9 +198,10 @@ If you prefer manual control:
    ```bash
    cd tf
    tofu init
-   tofu apply
+   tofu apply -parallelism=1
    ```
    This creates VMs and DNS records. All resources are in state.
+   Serial execution prevents Pihole API session exhaustion.
 
 2. **Build Puppet Enterprise:**
    ```bash
@@ -248,7 +249,7 @@ With `enable_ubuntu=true`, `prod_clients=1`, `dev_clients=0`:
 
 **Deploy Clients:**
 ```bash
-cd tf && tofu apply  # Create VMs
+cd tf && tofu apply -parallelism=1  # Create VMs
 bolt plan run proxtoboltfu::build_agents  # Configure agents
 ```
 
