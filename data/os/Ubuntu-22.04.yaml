@@ -1,0 +1,2 @@
+# Ubuntu 22.04 specific configuration
+enable_sce: true

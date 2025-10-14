@@ -9,6 +9,8 @@ hierarchy:
       pkcs7_private_key: keys/private_key.pkcs7.pem
       pkcs7_public_key: keys/public_key.pkcs7.pem
     paths:
+      - "os/%{facts.os.name}-%{facts.os.release.full}.yaml"
+      - "os/%{facts.os.name}-%{facts.os.release.major}.yaml"
       - "pe.yaml"
       - "scm.yaml"
       - "cd4pe.yaml"
