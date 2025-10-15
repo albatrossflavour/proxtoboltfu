@@ -318,13 +318,6 @@ plan proxtoboltfu::bootstrap_control_repo (
   }
 
   out::message("=== Control Repo Bootstrap Complete ===")
-  out::message("")
-  out::message("Next steps:")
-  out::message("  1. Migrate hiera data to data/roles/ using migrate_hiera_to_roles plan")
-  out::message("  2. Review and update Puppetfile if needed")
-  out::message("  3. Configure Code Manager in PE")
-  out::message("  4. Deploy with: puppet-code deploy production --wait")
-  out::message("")
   out::message("Control repo location: ${repo_path}")
 
   return {
