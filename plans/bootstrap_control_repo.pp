@@ -29,6 +29,37 @@ plan proxtoboltfu::bootstrap_control_repo (
   out::message("  Local path: ${repo_path}")
   out::message("")
 
+  # Check if directory already exists FIRST
+  $check_dir = run_command(
+    "test -d ${repo_path} && echo 'exists' || echo 'not found'",
+    'localhost',
+    '_run_as' => system::env('USER'),
+    '_catch_errors' => true
+  )
+
+  if $check_dir.ok {
+    $dir_status = $check_dir.first.value['stdout'].strip
+
+    if $dir_status == 'exists' {
+      unless $overwrite {
+        fail_plan(@(END))
+          Directory already exists: ${repo_path}
+
+          This directory may contain uncommitted work.
+          To remove it and start fresh, run with overwrite=true:
+
+            bolt plan run proxtoboltfu::bootstrap_control_repo overwrite=true
+
+          Or manually remove it first:
+
+            rm -rf ${repo_path}
+          END
+      }
+
+      out::message("⚠ Directory exists, removing (overwrite=true)...")
+    }
+  }
+
   # Create GitHub repository if it doesn't exist
   out::message("Checking GitHub repository...")
 
@@ -73,37 +104,6 @@ plan proxtoboltfu::bootstrap_control_repo (
   }
 
   out::message("")
-
-  # Check if directory already exists
-  $check_dir = run_command(
-    "test -d ${repo_path} && echo 'exists' || echo 'not found'",
-    'localhost',
-    '_run_as' => system::env('USER'),
-    '_catch_errors' => true
-  )
-
-  if $check_dir.ok {
-    $dir_status = $check_dir.first.value['stdout'].strip
-
-    if $dir_status == 'exists' {
-      unless $overwrite {
-        fail_plan(@(END))
-          Directory already exists: ${repo_path}
-
-          This directory may contain uncommitted work.
-          To remove it and start fresh, run with overwrite=true:
-
-            bolt plan run proxtoboltfu::bootstrap_control_repo overwrite=true
-
-          Or manually remove it first:
-
-            rm -rf ${repo_path}
-          END
-      }
-
-      out::message("⚠ Directory exists, removing (overwrite=true)...")
-    }
-  }
 
   # Phase 1: Clone template and setup git
   out::message("Phase 1: Cloning puppetlabs control-repo template...")
@@ -193,8 +193,9 @@ plan proxtoboltfu::bootstrap_control_repo (
     rm -rf data && \
     mkdir -p data/roles data/nodes data/os && \
     cp ${work_dir}/proxtoboltfu/data/common.yaml data/ && \
+    cp ${work_dir}/proxtoboltfu/data/roles/*.yaml data/roles/ 2>/dev/null || true && \
     cp ${work_dir}/proxtoboltfu/data/os/*.yaml data/os/ 2>/dev/null || true && \
-    touch data/roles/.gitkeep data/nodes/.gitkeep
+    touch data/nodes/.gitkeep
     | EOT
 
   $data_result = run_command(
@@ -208,7 +209,7 @@ plan proxtoboltfu::bootstrap_control_repo (
     fail_plan("Failed to copy hiera data: ${data_result.first.error}")
   }
 
-  out::message("✓ Hiera data copied (common.yaml, os/*.yaml)")
+  out::message("✓ Hiera data copied (common.yaml, roles/*.yaml, os/*.yaml)")
   out::message("")
 
   # Phase 3: Initial commit
@@ -254,11 +255,13 @@ plan proxtoboltfu::bootstrap_control_repo (
 
   out::message("✓ Initial commit created")
 
-  # Create production branch
+  # Create production and development branches
   $branch_cmd = @("EOT")
     cd ${repo_path} && \
     git checkout -b production && \
-    git branch -D main || true
+    git branch -D main || true && \
+    git checkout -b development && \
+    git checkout production
     | EOT
 
   $branch_result = run_command(
@@ -269,17 +272,17 @@ plan proxtoboltfu::bootstrap_control_repo (
   )
 
   unless $branch_result.ok {
-    fail_plan("Failed to create production branch: ${branch_result.first.error}")
+    fail_plan("Failed to create branches: ${branch_result.first.error}")
   }
 
-  out::message("✓ Production branch created")
+  out::message("✓ Production and development branches created")
   out::message("")
 
   # Push if requested
   if $push {
-    out::message("Pushing to remote...")
+    out::message("Pushing branches to remote...")
 
-    $push_cmd = "cd ${repo_path} && git push -u origin production"
+    $push_cmd = "cd ${repo_path} && git push -u origin production development"
 
     $push_result = run_command(
       $push_cmd,
@@ -306,11 +309,11 @@ plan proxtoboltfu::bootstrap_control_repo (
 
         To push manually after fixing:
           cd ${repo_path}
-          git push -u origin production
+          git push -u origin production development
         END
     }
 
-    out::message("✓ Pushed to ${repo_url}")
+    out::message("✓ Pushed production and development branches to ${repo_url}")
     out::message("")
   }
 

@@ -3,16 +3,15 @@ defaults:
   datadir: data
   data_hash: yaml_data
 hierarchy:
-  - name: "Eyaml Config"
+  - name: "Eyaml hierarchy"
     lookup_key: eyaml_lookup_key
     options:
       pkcs7_private_key: keys/private_key.pkcs7.pem
       pkcs7_public_key: keys/public_key.pkcs7.pem
     paths:
-      - "os/%{facts.os.name}-%{facts.os.release.full}.yaml"
-      - "os/%{facts.os.name}-%{facts.os.release.major}.yaml"
-      - "pe.yaml"
-      - "scm.yaml"
-      - "cd4pe.yaml"
-      - "nessus.yaml"
+      - "roles/role::pe::primary.yaml"
+      - "roles/role::pe::scm.yaml"
+      - "roles/role::pe::cd4pe.yaml"
+      - "roles/role::pe::nessus.yaml"
+      - "roles/role::pe::dashboard.yaml"
       - "common.yaml"

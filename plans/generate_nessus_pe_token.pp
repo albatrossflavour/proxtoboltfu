@@ -1,9 +1,11 @@
 # @summary Generate PE RBAC token for Nessus Transformer
 # @param regenerate Whether to regenerate token even if one exists (default: false)
 # @param commit_changes Whether to git commit and push the updated nessus.yaml (default: false)
+# @param work_dir Directory containing control repo (default: ~/dev)
 plan proxtoboltfu::generate_nessus_pe_token (
   Boolean $regenerate = false,
-  Boolean $commit_changes = false
+  Boolean $commit_changes = false,
+  String $work_dir = '~/dev'
 ) {
 
   out::message("Checking for existing Nessus Transformer PE token...")
@@ -81,12 +83,41 @@ plan proxtoboltfu::generate_nessus_pe_token (
 
   out::message("  ✓ Token encrypted successfully")
 
-  # Update data/nessus.yaml with encrypted token
-  out::message("  Updating data/nessus.yaml...")
+  # Determine where to write the token
+  $control_repo_name = lookup('pe_control_repo_name', String, first, 'puppet-control-repo')
+  $control_repo_path = "${work_dir}/${control_repo_name}"
 
-  # Use a more robust method to update the file
+  # Check if control repo exists
+  $check_control_repo = run_command(
+    "test -d ${control_repo_path} && echo 'exists' || echo 'not found'",
+    'localhost',
+    '_run_as' => system::env('USER'),
+    '_catch_errors' => true
+  )
+
+  if $check_control_repo.ok and $check_control_repo.first.value['stdout'].strip == 'exists' {
+    $nessus_yaml_path = "${control_repo_path}/data/roles/role::pe::nessus.yaml"
+    $use_control_repo = true
+    out::message("  Updating control repo: ${nessus_yaml_path}...")
+
+    # Ensure we're on production branch
+    $checkout_prod = run_command(
+      "cd ${control_repo_path} && git checkout production",
+      'localhost',
+      '_run_as' => system::env('USER'),
+      '_catch_errors' => true
+    )
+
+    unless $checkout_prod.ok {
+      fail_plan("Failed to checkout production branch: ${checkout_prod.first.error}")
+    }
+  } else {
+    $nessus_yaml_path = 'data/roles/role::pe::nessus.yaml'
+    $use_control_repo = false
+    out::message("  Updating proxtoboltfu: ${nessus_yaml_path}...")
+  }
+
   # Write encrypted token to temp file to avoid shell escaping issues
-  $nessus_yaml_path = 'data/nessus.yaml'
   $temp_token_file = '/tmp/nessus_pe_token.tmp'
 
   $write_token = run_command(
@@ -101,8 +132,14 @@ plan proxtoboltfu::generate_nessus_pe_token (
   }
 
   # Use awk with -v to safely pass the token value
+  # This handles both updating existing line and appending if not found
   $update_cmd = @("EOT")
-    awk -v token="$(cat ${temp_token_file})" '/^nessus_transformer::pe_token:/ { print "nessus_transformer::pe_token: " token; next } {print}' ${nessus_yaml_path} > ${nessus_yaml_path}.tmp && \
+    awk -v token="$(cat ${temp_token_file})" '
+      BEGIN { found=0 }
+      /^nessus_transformer::pe_token:/ { print "nessus_transformer::pe_token: " token; found=1; next }
+      { print }
+      END { if (!found) print "nessus_transformer::pe_token: " token }
+    ' ${nessus_yaml_path} > ${nessus_yaml_path}.tmp && \
     mv ${nessus_yaml_path}.tmp ${nessus_yaml_path} && \
     rm ${temp_token_file}
     | EOT
@@ -119,29 +156,63 @@ plan proxtoboltfu::generate_nessus_pe_token (
   }
 
   out::message("✓ Nessus Transformer PE token generated and stored successfully")
-  out::message("  Token stored in: data/nessus.yaml (eyaml encrypted)")
+  out::message("  Token stored in: ${nessus_yaml_path} (eyaml encrypted)")
 
   # Commit and push changes if requested
   if $commit_changes {
     out::message("  Committing changes to git...")
 
-    $git_commit = run_command(
-      "git add ${nessus_yaml_path} && git commit -m \"Update Nessus PE token\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\" && git push",
-      'localhost',
-      '_run_as' => system::env('USER'),
-      '_catch_errors' => true
-    )
+    if $use_control_repo {
+      # Working in control repo
+      $git_commit = run_command(
+        "cd ${control_repo_path} && git add \"data/roles/role::pe::nessus.yaml\" && git commit -m \"Update Nessus PE token\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\" && git push",
+        'localhost',
+        '_run_as' => system::env('USER'),
+        '_catch_errors' => true
+      )
 
-    unless $git_commit.ok {
-      fail_plan("Failed to commit changes: ${git_commit.first.error}")
+      unless $git_commit.ok {
+        fail_plan("Failed to commit changes: ${git_commit.first.error}")
+      }
+
+      out::message("  ✓ Changes committed and pushed to control repo")
+
+      # Deploy via Code Manager
+      out::message("  Deploying via Code Manager...")
+
+      $code_deploy = run_command(
+        'puppet-code deploy production --wait',
+        'localhost',
+        '_run_as' => system::env('USER'),
+        '_catch_errors' => true
+      )
+
+      unless $code_deploy.ok {
+        fail_plan("Failed to deploy code: ${code_deploy.first.error}")
+      }
+
+      out::message("  ✓ Code deployed via Code Manager")
+    } else {
+      # Working in proxtoboltfu
+      $git_commit = run_command(
+        "git add ${nessus_yaml_path} && git commit -m \"Update Nessus PE token\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\" && git push",
+        'localhost',
+        '_run_as' => system::env('USER'),
+        '_catch_errors' => true
+      )
+
+      unless $git_commit.ok {
+        fail_plan("Failed to commit changes: ${git_commit.first.error}")
+      }
+
+      out::message("  ✓ Changes committed and pushed to proxtoboltfu")
     }
-
-    out::message("  ✓ Changes committed and pushed to git")
   }
 
   return {
     status => 'completed',
     token_file => $nessus_yaml_path,
-    committed => $commit_changes
+    committed => $commit_changes,
+    control_repo => $use_control_repo
   }
 }
