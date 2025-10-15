@@ -1,3 +1,9 @@
+# This Puppetfile is managed by Bolt. Do not edit.
+# For more information, see https://pup.pt/bolt-modules
+
+# The following directive installs modules to the managed moduledir.
+moduledir '.modules'
+
 mod 'puppetlabs/complyadm', '3.5.0'
 mod 'puppetlabs/cd4peadm', '5.11.0'
 mod 'puppetlabs/peadm', '3.33.0'
@@ -17,18 +23,3 @@ mod 'puppetlabs/powershell', '6.0.2'
 mod 'puppetlabs/reboot', '5.1.0'
 mod 'puppetlabs/facts', '1.7.0'
 mod 'puppetlabs/pwshlib', '1.2.3'
-mod 'puppet/grafana', '14.1.0'
-mod 'puppet/telegraf', '5.4.0'
-mod 'puppetlabs/influxdb', '2.4.0'
-mod 'puppet/nginx', '7.0.0'
-mod 'puppetlabs/exec', '3.1.0'
-mod 'puppetlabs-sce_linux', '2.5.0'
-mod 'puppet-firewalld', '5.0.0'
-mod 'puppet-systemd', '8.2.0'
-mod 'puppetlabs-nessus_transformer', '1.0.2'
-mod 'puppetlabs-puppet_operational_dashboards', '2.4.0'
-mod 'puppet-prometheus', '16.4.0'
-mod 'puppet/archive', '7.1.0'
-mod 'puppetlabs/concat', '9.1.0'
-mod 'puppet-python', '8.0.0'
-mod 'puppetlabs-node_encrypt', '3.1.0'
