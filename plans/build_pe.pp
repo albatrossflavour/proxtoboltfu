@@ -57,6 +57,10 @@ plan proxtoboltfu::build_pe {
     out::message("Warning: No pe_license_content found in hiera")
   }
 
+  run_plan('proxtoboltfu::bootstrap_control_repo',
+    'push' => true
+  )
+
   # Deploy code to production environment
   out::message("Deploying code to production environment...")
   run_task('peadm::code_manager', $targets,
@@ -117,5 +121,5 @@ plan proxtoboltfu::build_pe {
 
   out::message("Puppet Enterprise build completed successfully")
 
-  return { status => 'completed' }
+  return { status                                                                        => 'completed' }
 }
