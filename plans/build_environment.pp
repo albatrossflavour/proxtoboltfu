@@ -36,6 +36,20 @@ plan proxtoboltfu::build_environment (
   out::message("✓ Puppet Enterprise build complete (includes CA cert and console login)")
   out::message("")
 
+  # Step 2.5: Generate Nessus PE token (if Nessus will be deployed)
+  $nessus_check = run_task('proxtoboltfu::tofu_inventory', 'localhost',
+    'dir' => 'tf',
+    'tag_filter' => 'nessus'
+  )
+  $nessus_check_data = $nessus_check.first.value['value']
+
+  if !$nessus_check_data.empty {
+    out::message("Step 2.5: Generating Nessus PE token...")
+    run_plan('proxtoboltfu::generate_nessus_pe_token', 'regenerate' => true)
+    out::message("✓ Nessus PE token generated")
+    out::message("")
+  }
+
   # Step 3: Build additional infrastructure servers
   out::message("Step 3: Building additional infrastructure servers...")
 

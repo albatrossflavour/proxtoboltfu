@@ -157,6 +157,23 @@ resource "pihole_dns_record" "new-puppet" {
 
 DNS propagates immediately, so hostnames resolve before Bolt plans run.
 
+**DNS Search Domain Configuration:**
+
+VMs are configured with static IPs and explicit DNS settings via
+cloud-init. The `searchdomain` parameter in Terraform sets the DNS
+search domain, overriding any inherited settings from Proxmox
+templates:
+
+```hcl
+searchdomain = var.domain
+nameserver   = "192.168.9.2 192.168.9.3"
+```
+
+This ensures VMs use `albatrossflavour.com` as their search domain,
+regardless of the Proxmox host's DNS configuration. If Proxmox
+templates are set to "use host settings", Terraform will override
+this during VM creation.
+
 ### 6. SSH Configuration
 
 Uses ed25519 keys for modern cryptography:

@@ -48,6 +48,20 @@ gem install hiera-eyaml
 - **Proxmox VE** cluster with API access
 - **Pihole** DNS server with API access
 - **SSH access** to Proxmox hosts
+- **Proxmox VM templates** with cloud-init enabled
+
+**Template Requirements:**
+
+Proxmox templates should have cloud-init configured with:
+
+- **DNS domain:** Set to "use host settings" or leave blank
+- **DNS servers:** Set to "use host settings" or leave blank
+- **IP Config:** Set to DHCP (will be overridden by Terraform)
+
+The `searchdomain` parameter in Terraform will override template
+settings. If your Proxmox host has a different DNS domain configured,
+Terraform will still set the correct domain (`albatrossflavour.com`)
+for VMs.
 
 ### Required Access
 
@@ -554,6 +568,26 @@ ls -la keys/
 
 # Test decryption
 eyaml decrypt -f data/common.yaml
+```
+
+**VMs have wrong DNS search domain:**
+
+If VMs show incorrect search domain (check with `resolvectl status`):
+
+```bash
+# On the VM, check netplan config
+cat /etc/netplan/50-cloud-init.yaml
+
+# If search domain is wrong, it's inherited from Proxmox template
+# The searchdomain parameter in Terraform overrides this
+# For existing VMs, either recreate or manually fix:
+sudo sed -i 's/wrong.domain.com/albatrossflavour.com/g' \
+  /etc/netplan/50-cloud-init.yaml
+sudo netplan apply
+
+# Or recreate the VM with updated Terraform config
+tofu -chdir=tf apply -parallelism=1 \
+  -replace=proxmox_vm_qemu.server-name[0]
 ```
 
 ## Architecture

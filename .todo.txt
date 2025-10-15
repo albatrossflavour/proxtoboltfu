@@ -11,3 +11,5 @@ Create plan to backup/restore hiera configs +backup @operations
 Fix the nessus class by auto-generating a token and storing it in hiera during provisioning +automation @operations
 x 2025-10-12 Create status task/plan to show infrastructure state +monitoring @operations
 Improve tofo outputs
+Install the data conenctor and new graphs as part of the metric dashboard deployment
+is there a way to setup and run a CIS scan via the API?
