@@ -62,7 +62,7 @@ plan proxtoboltfu::generate_nessus_pe_token (
   # Encrypt token with eyaml
   out::message("  Encrypting token with eyaml...")
 
-  $encrypt_cmd = "echo '${pe_token}' | eyaml encrypt --stdin --pkcs7-private-key=keys/private_key.pkcs7.pem --pkcs7-public-key=keys/public_key.pkcs7.pem | grep 'ENC\\[' | sed 's/^string: //'"
+  $encrypt_cmd = "echo '${pe_token}' | eyaml encrypt --stdin --pkcs7-private-key=keys/private_key.pkcs7.pem --pkcs7-public-key=keys/public_key.pkcs7.pem | grep 'ENC\\[' | head -n 1 | sed 's/^string: //'"
 
   $encrypt_result = run_command(
     $encrypt_cmd,
@@ -82,12 +82,31 @@ plan proxtoboltfu::generate_nessus_pe_token (
   # Update data/nessus.yaml with encrypted token
   out::message("  Updating data/nessus.yaml...")
 
-  # Read current file to determine if we're adding or replacing
+  # Use a more robust method to update the file
+  # Write encrypted token to temp file to avoid shell escaping issues
   $nessus_yaml_path = 'data/nessus.yaml'
+  $temp_token_file = '/tmp/nessus_pe_token.tmp'
 
-  # Try to replace existing token value (could be ~ or an old encrypted value)
+  $write_token = run_command(
+    "echo '${encrypted_token}' > ${temp_token_file}",
+    'localhost',
+    '_run_as' => system::env('USER'),
+    '_catch_errors' => true
+  )
+
+  unless $write_token.ok {
+    fail_plan("Failed to write temp token file: ${write_token.first.error}")
+  }
+
+  # Use awk with -v to safely pass the token value
+  $update_cmd = @("EOT")
+    awk -v token="$(cat ${temp_token_file})" '/^nessus_transformer::pe_token:/ { print "nessus_transformer::pe_token: " token; next } {print}' ${nessus_yaml_path} > ${nessus_yaml_path}.tmp && \
+    mv ${nessus_yaml_path}.tmp ${nessus_yaml_path} && \
+    rm ${temp_token_file}
+    | EOT
+
   $update_result = run_command(
-    "sed -i.bak 's|^nessus_transformer::pe_token:.*|nessus_transformer::pe_token: ${encrypted_token}|' ${nessus_yaml_path} && rm ${nessus_yaml_path}.bak",
+    $update_cmd,
     'localhost',
     '_run_as' => system::env('USER'),
     '_catch_errors' => true
