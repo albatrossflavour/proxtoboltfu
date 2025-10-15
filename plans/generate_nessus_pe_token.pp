@@ -84,7 +84,12 @@ plan proxtoboltfu::generate_nessus_pe_token (
   out::message("  ✓ Token encrypted successfully")
 
   # Determine where to write the token
-  $control_repo_name = lookup('pe_control_repo_name', String, first, 'puppet-control-repo')
+  # Extract control repo name from r10k_remote
+  $pe_params = lookup('peadm::config', Hash, first, undef)
+  $repo_url = $pe_params['r10k_remote']
+  $url_parts = split($repo_url, '/')
+  $repo_name_with_ext = $url_parts[-1]
+  $control_repo_name = regsubst($repo_name_with_ext, '\.git$', '')
   $control_repo_path = "${work_dir}/${control_repo_name}"
 
   # Check if control repo exists

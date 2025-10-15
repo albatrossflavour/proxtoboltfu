@@ -1,5 +1,2 @@
 # Common configuration for all nodes
 # Role-specific configuration is in data/roles/
-# GitHub configuration for control repo
-pe_github_username: albatrossflavour
-pe_control_repo_name: puppet-control-repo

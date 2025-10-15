@@ -11,21 +11,27 @@ plan proxtoboltfu::bootstrap_control_repo (
   out::message("=== Bootstrapping Puppet Control Repo ===")
   out::message("")
 
-  # Lookup configuration from hiera
-  $github_username = lookup('pe_github_username', String, first, undef)
-  $control_repo_name = lookup('pe_control_repo_name', String, first, undef)
+  # Lookup r10k remote from hiera
+  $pe_params = lookup('peadm::config', Hash, first, undef)
+  $repo_url = $pe_params['r10k_remote']
 
-  unless $github_username and $control_repo_name {
-    fail_plan("github_username and control_repo_name must be set in peadm::config")
+  unless $repo_url {
+    fail_plan("r10k_remote must be set in peadm::config")
   }
 
-  $repo_url = "git@github.com:${github_username}/${control_repo_name}.git"
+  # Extract repo name from git URL (e.g., git@github.com:user/repo.git -> repo)
+  $url_parts = split($repo_url, '/')
+  $repo_name_with_ext = $url_parts[-1]
+  $control_repo_name = regsubst($repo_name_with_ext, '\.git$', '')
   $repo_path = "${work_dir}/${control_repo_name}"
 
+  # Extract GitHub username for repo creation
+  $github_username = regsubst($repo_url, '^git@github\.com:([^/]+)/.*$', '\1')
+
   out::message("Configuration:")
-  out::message("  GitHub user: ${github_username}")
-  out::message("  Repo name: ${control_repo_name}")
   out::message("  Repo URL: ${repo_url}")
+  out::message("  Repo name: ${control_repo_name}")
+  out::message("  GitHub user: ${github_username}")
   out::message("  Local path: ${repo_path}")
   out::message("")
 

@@ -26,17 +26,37 @@ proxtoboltfu/
 │   ├── build_nessus.pp           # Build Nessus scanner
 │   ├── build_agents.pp           # Build Puppet agent clients
 │   ├── destroy_clients.pp        # Destroy agent clients with PE purge
+│   ├── bootstrap_control_repo.pp # Create and push control repo to GitHub
+│   ├── destroy_control_repo.pp   # Delete control repo from GitHub and local
+│   ├── generate_nessus_pe_token.pp # Generate PE RBAC token for Nessus
 │   ├── fetch_ca_cert.pp          # Download CA cert from PE server
 │   └── puppet_access_login.pp    # Login to PE console
 ├── tasks/                        # Bolt tasks
 │   ├── tofu_inventory.sh         # Dynamic inventory from Terraform state
 │   └── tofu_inventory.json       # Task metadata
 ├── data/                         # Hiera data
-│   └── common.yaml               # Common configuration (includes eyaml encrypted data)
+│   ├── common.yaml               # Minimal common configuration
+│   ├── roles/                    # Role-based hiera data
+│   │   ├── role::pe::primary.yaml    # PE primary server config
+│   │   ├── role::pe::scm.yaml        # SCM/Comply server config
+│   │   ├── role::pe::cd4pe.yaml      # CD4PE server config
+│   │   ├── role::pe::nessus.yaml     # Nessus scanner config
+│   │   └── role::pe::dashboard.yaml  # Dashboard server config
+│   ├── nodes/                    # Node-specific overrides (empty)
+│   └── os/                       # OS-specific configuration
+├── control-repo-template/        # Template for puppet-control-repo
+│   ├── README.md
+│   ├── Puppetfile                # Agent-side modules only
+│   ├── hiera.yaml                # Uses absolute paths + trusted facts
+│   ├── environment.conf
+│   ├── manifests/
+│   ├── site-modules/
+│   ├── scripts/
+│   └── data/                     # Placeholders (actual files copied at bootstrap)
 ├── keys/                         # Eyaml encryption keys
 │   ├── private_key.pkcs7.pem
 │   └── public_key.pkcs7.pem
-├── hiera.yaml                    # Hiera configuration
+├── hiera.yaml                    # Hiera configuration (Bolt-side, relative paths)
 ├── bolt-project.yaml             # Bolt project configuration
 └── inventory.yaml                # Bolt inventory (dynamic via task plugin)
 ```
@@ -45,17 +65,25 @@ proxtoboltfu/
 
 ### 1. Separation of Concerns
 
-**Infrastructure Build (OpenTofu):**
-- Provisions VMs on Proxmox
+This project maintains a clear separation between infrastructure provisioning and configuration management:
+
+**Infrastructure Provisioning (proxtoboltfu):**
+- Uses OpenTofu to provision VMs on Proxmox
 - Creates DNS records in Pihole
 - Manages VM lifecycle
-- **Does NOT** run provisioning/configuration
+- Uses Puppet Bolt to build/configure infrastructure servers
+- **Does NOT** manage agent configuration (that's the control repo's job)
 
-**Configuration Management (Bolt):**
-- Runs after infrastructure is built
-- Uses dynamic inventory from Terraform state
-- Configures Puppet Enterprise, SCM, CD4PE
-- Provisions agents
+**Agent Configuration Management (puppet-control-repo):**
+- Separate Git repository created by `bootstrap_control_repo` plan
+- Manages Puppet code for agent nodes
+- Uses role-based hiera with trusted facts
+- Deployed to agents via Code Manager
+- Contains manifests, site-modules, Puppetfile for agent-side modules
+
+**Key Distinction:**
+- **proxtoboltfu** = Infrastructure automation (builds servers)
+- **puppet-control-repo** = Configuration management (configures agents)
 
 ### 2. Tag-Based Inventory
 
@@ -114,28 +142,71 @@ The script handles multiple IP scenarios:
 - DHCP: Falls back to using hostname for DNS resolution
 - Guest Agent: Uses `default_ipv4_address` if available from Proxmox guest agent
 
-### 4. Hiera Configuration
+### 4. Dual-Repository Hiera Architecture
+
+The project uses two separate repositories with different hiera configurations:
+
+#### proxtoboltfu Hiera (Bolt-side)
+
+**Purpose:** Infrastructure builds where Bolt runs on localhost
+**Location:** `proxtoboltfu/hiera.yaml`
+**Key Paths:** Relative (`keys/private_key.pkcs7.pem`)
+
+```yaml
+hierarchy:
+  - name: "Eyaml hierarchy"
+    lookup_key: eyaml_lookup_key
+    options:
+      pkcs7_private_key: keys/private_key.pkcs7.pem
+      pkcs7_public_key: keys/public_key.pkcs7.pem
+    paths:
+      - "roles/role::pe::primary.yaml"
+      - "roles/role::pe::scm.yaml"
+      - "roles/role::pe::cd4pe.yaml"
+      - "roles/role::pe::nessus.yaml"
+      - "roles/role::pe::dashboard.yaml"
+      - "common.yaml"
+```
+
+**Note:** Bolt doesn't have trusted facts, so all role files are listed explicitly.
+
+#### puppet-control-repo Hiera (Agent-side)
+
+**Purpose:** Agent configuration via Code Manager
+**Location:** `puppet-control-repo/hiera.yaml`
+**Key Paths:** Absolute (`/etc/puppetlabs/secure/keys/...`)
+
+```yaml
+hierarchy:
+  - name: "Eyaml hierarchy"
+    lookup_key: eyaml_lookup_key
+    options:
+      pkcs7_private_key: /etc/puppetlabs/secure/keys/private_key.pkcs7.pem
+      pkcs7_public_key: /etc/puppetlabs/secure/keys/public_key.pkcs7.pem
+    paths:
+      - "nodes/%{trusted.certname}.yaml"
+      - "roles/%{trusted.extensions.pp_role}.yaml"
+      - "os/%{facts.os.name}-%{facts.os.release.full}.yaml"
+      - "os/%{facts.os.name}-%{facts.os.release.major}.yaml"
+      - "common.yaml"
+```
+
+**Note:** Uses trusted facts and facts for dynamic role/node/OS lookups on agents.
+
+#### Hiera Lookups in Bolt Plans
 
 Bolt plans use hiera lookups instead of hardcoded values:
 
-**build_pe.pp:**
 ```puppet
+# Lookup PE config
 $params = lookup('peadm::config', Hash, first, undef)
 $targets = get_targets($params['primary_host'])
-```
 
-**build_scm.pp / build_cd4pe.pp:**
-```puppet
+# Lookup infrastructure config
 $config = lookup('complyadm::config', Hash, first, undef)
 $target_host = $config['resolvable_hostname']
-$targets = get_targets($target_host)
 
-$peadm_config = lookup('peadm::config', Hash, first, undef)
-$puppet_server = $peadm_config['primary_host']
-```
-
-CSR attributes are separated to avoid module schema conflicts:
-```puppet
+# Lookup CSR attributes (separated to avoid schema conflicts)
 $csr_attributes = lookup('complyadm::csr_attributes', Hash, first, {
   'datacenter' => 'lab',
   'role' => 'role::pe::scm',
@@ -143,7 +214,53 @@ $csr_attributes = lookup('complyadm::csr_attributes', Hash, first, {
 })
 ```
 
-### 5. DNS Integration
+#### Single Source of Truth: r10k_remote
+
+Both `bootstrap_control_repo` and `generate_nessus_pe_token` plans extract the control repo location from `peadm::config['r10k_remote']`:
+
+```puppet
+# Extract from r10k_remote (no duplicate config)
+$pe_params = lookup('peadm::config', Hash, first, undef)
+$repo_url = $pe_params['r10k_remote']
+# e.g., git@github.com:albatrossflavour/puppet-control-repo.git
+
+# Parse repo name and GitHub username
+$url_parts = split($repo_url, '/')
+$repo_name_with_ext = $url_parts[-1]
+$control_repo_name = regsubst($repo_name_with_ext, '\.git$', '')
+$github_username = regsubst($repo_url, '^git@github\.com:([^/]+)/.*$', '\1')
+```
+
+This ensures consistency - the control repo location is defined once in `data/roles/role::pe::primary.yaml`.
+
+### 5. Control Repository Template
+
+The `control-repo-template/` directory contains static template files that get copied during bootstrap:
+
+**Structure:**
+```
+control-repo-template/
+├── README.md
+├── Puppetfile              # Agent-side modules only (NOT Bolt modules)
+├── hiera.yaml              # Uses absolute paths for PE server
+├── environment.conf
+├── manifests/
+├── site-modules/
+├── scripts/
+└── data/
+    ├── common.yaml         # Placeholder (actual file copied at bootstrap)
+    ├── roles/              # Empty (actual files copied at bootstrap)
+    ├── nodes/              # Empty
+    └── os/                 # Empty (actual files copied at bootstrap)
+```
+
+**Key differences from proxtoboltfu:**
+- Puppetfile contains only agent-side modules (no peadm, complyadm, cd4peadm)
+- hiera.yaml uses absolute paths (`/etc/puppetlabs/secure/keys/`)
+- hiera.yaml uses trusted facts and facts for dynamic lookups
+- Data files are placeholders - actual data copied from proxtoboltfu at bootstrap time
+
+### 6. DNS Integration
 
 Pihole DNS records are created automatically by Terraform:
 
@@ -174,7 +291,7 @@ regardless of the Proxmox host's DNS configuration. If Proxmox
 templates are set to "use host settings", Terraform will override
 this during VM creation.
 
-### 6. SSH Configuration
+### 7. SSH Configuration
 
 Uses ed25519 keys for modern cryptography:
 
@@ -325,6 +442,86 @@ locals {
 - Total agents = (enabled OS versions) × (prod + dev clients)
 - Example: 9 OS families × 2 versions avg × (5 prod + 3 dev) = 144 agents
 
+### Managing the Control Repository
+
+The control repository is created and destroyed using automated plans:
+
+#### Bootstrap Control Repo
+
+Creates the puppet-control-repo from the r10k_remote configuration:
+
+```bash
+# Create and push control repo to GitHub
+bolt plan run proxtoboltfu::bootstrap_control_repo push=true
+```
+
+**What it does:**
+1. Extracts repo URL from `peadm::config['r10k_remote']`
+2. Creates GitHub repository using `gh` CLI
+3. Clones puppetlabs/control-repo template
+4. Copies manifests, site-modules, scripts from `control-repo-template/`
+5. Copies current hiera data from `proxtoboltfu/data/` (with generated values)
+6. Creates production and development branches
+7. Leaves repo checked out on production branch
+8. Pushes both branches to GitHub
+
+**Safety features:**
+- Checks if local directory exists first
+- Requires `overwrite=true` to remove existing directory
+- Auto-creates GitHub repo if it doesn't exist
+
+**Parameters:**
+- `work_dir` - Directory to clone into (default: ~/dev)
+- `push` - Whether to push to GitHub (default: false)
+- `overwrite` - Remove existing directory (default: false)
+
+#### Destroy Control Repo
+
+Removes the control repository from GitHub and local filesystem:
+
+```bash
+# Dry run - shows what would be deleted
+bolt plan run proxtoboltfu::destroy_control_repo
+
+# Actually delete
+bolt plan run proxtoboltfu::destroy_control_repo confirm=true
+```
+
+**What it does:**
+1. Extracts repo URL from `peadm::config['r10k_remote']`
+2. Deletes local directory (~/dev/puppet-control-repo)
+3. Deletes GitHub repository using `gh` CLI
+
+**Safety features:**
+- Defaults to dry run (confirm=false)
+- Shows exactly what will be deleted before proceeding
+- Handles cases where repo or directory don't exist
+
+#### Generate Nessus PE Token
+
+Generates and stores PE RBAC token for Nessus Transformer:
+
+```bash
+# Generate token (writes to control repo if it exists, otherwise proxtoboltfu)
+bolt plan run proxtoboltfu::generate_nessus_pe_token commit_changes=true regenerate=false
+```
+
+**Smart token placement:**
+- Checks if control repo exists locally
+- If yes: writes to `control-repo/data/roles/role::pe::nessus.yaml`
+- If no: writes to `proxtoboltfu/data/roles/role::pe::nessus.yaml`
+- Ensures production branch is checked out before writing to control repo
+
+**Parameters:**
+- `regenerate` - Force regeneration even if token exists (default: false)
+- `commit_changes` - Git commit and push (default: false)
+- `work_dir` - Directory containing repos (default: ~/dev)
+
+**When using control repo:**
+- Commits to production branch
+- Pushes to GitHub
+- Runs `puppet-code deploy production --wait`
+
 ### Adding New Infrastructure Types
 
 To add a new type of infrastructure (e.g., compilers):
@@ -407,6 +604,37 @@ Tags are extensible - use semicolon-separated values and filter on any tag.
 - Single VM can belong to multiple logical groups
 - Easy ad-hoc queries: `--targets puppet-infrastructure`
 
+### Why Dual Repository Architecture?
+
+**Alternative:** Single repo containing both infrastructure automation and agent configuration.
+
+**Problems:**
+- Infrastructure build code mixed with agent Puppet code
+- Bolt modules (peadm, complyadm) deployed to agents unnecessarily
+- Can't use trusted facts in hiera (Bolt doesn't have them)
+- Eyaml key paths differ (relative for Bolt, absolute for PE server)
+- Agent changes trigger infrastructure rebuilds
+- No clear separation between build-time and runtime
+
+**Current approach:** Separate repos with distinct purposes.
+
+**Benefits:**
+- **proxtoboltfu**: Infrastructure builds, uses Bolt, includes build modules
+- **puppet-control-repo**: Agent config, uses Code Manager, excludes build modules
+- Each repo has appropriate hiera configuration:
+  - proxtoboltfu: Explicit file listing (no trusted facts)
+  - control-repo: Trusted facts and facts-based hierarchy
+- Eyaml keys in correct locations for each use case
+- Agent changes don't affect infrastructure code
+- Clear lifecycle: bootstrap creates, destroy removes
+- Single source of truth via r10k_remote
+
+**Implementation details:**
+- Bootstrap plan copies current data from proxtoboltfu (with generated values)
+- Token generation intelligently detects which repo to update
+- Both repos use same role-based structure (different hiera lookups)
+- Control repo created on demand, not checked into proxtoboltfu
+
 ## Troubleshooting
 
 ### Inventory Not Showing Expected Targets
@@ -451,15 +679,31 @@ ls -la keys/
 
 ### How Everything Connects
 
-1. **Terraform** creates VMs with tags and IPs
+**Infrastructure Build Flow (proxtoboltfu):**
+1. **Terraform** creates VMs with tags, IPs, and DNS records
 2. **Terraform state** stores resource information
 3. **tofu_inventory task** reads state, filters by tags, returns targets
 4. **inventory.yaml** uses task plugin to populate groups dynamically
-5. **Bolt plans** lookup config from **hiera** (data/common.yaml)
-6. **Hiera** uses hostnames that match **DNS records** created by Terraform
+5. **Bolt plans** lookup config from **proxtoboltfu hiera** (data/roles/*.yaml)
+6. **Hiera** resolves hostnames that match **DNS records** created by Terraform
 7. **Plans** use `get_targets()` which resolves via **inventory groups**
+8. **Plans** configure infrastructure servers using Bolt modules (peadm, complyadm, etc.)
 
-The loop is closed: Terraform → State → Inventory → Plans → Hiera → Terraform (DNS)
+**Control Repo Flow (puppet-control-repo):**
+1. **bootstrap_control_repo** plan extracts location from r10k_remote
+2. Creates GitHub repo and clones puppetlabs template
+3. Copies current data from **proxtoboltfu/data/** (preserves generated values)
+4. Pushes to GitHub with production and development branches
+5. **Code Manager** on PE server deploys from r10k_remote
+6. **Agents** connect to PE server and fetch catalog
+7. **PE server hiera** uses trusted facts to lookup role-based data
+8. Agents apply configuration from site-modules
+
+**Dual-Repo Integration:**
+- r10k_remote in peadm::config is single source of truth
+- Bootstrap copies data with eyaml-encrypted values
+- Token generation updates whichever repo exists locally
+- Both repos share same role-based structure (different lookups)
 
 ## Important Notes
 
@@ -468,6 +712,10 @@ The loop is closed: Terraform → State → Inventory → Plans → Hiera → Te
 - **Test** tag filters before deploying: `PT_tag_filter=<tag> ./tasks/tofu_inventory.sh`
 - **Extend** via tags, not by modifying inventory task
 - Terraform and Bolt are **decoupled** - run independently
+- **Control repo** is created on demand - not checked into proxtoboltfu
+- **r10k_remote** is the single source of truth for control repo location
+- **Bootstrap** before first agent run, **destroy** when tearing down
+- **Token generation** works with both repos - detects which one to update
 
 ## Working Principles
 
