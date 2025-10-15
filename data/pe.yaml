@@ -7,6 +7,8 @@ peadm::config:
   dns_alt_names:
     - puppet
   code_manager_auto_configure: true
+  github_username: albatrossflavour
+  control_repo_name: puppet-control-repo
   r10k_known_hosts:
     - name: "github.com"
       type: "ssh-ed25519"

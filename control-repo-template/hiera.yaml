@@ -1,0 +1,18 @@
+version: 5
+defaults:
+  datadir: data
+  data_hash: yaml_data
+hierarchy:
+  - name: "Eyaml hierarchy"
+    lookup_key: eyaml_lookup_key
+    options:
+      # IMPORTANT: Absolute paths because this is deployed by Code Manager
+      # Keys are copied to /etc/puppetlabs/secure/keys/ during PE build
+      pkcs7_private_key: /etc/puppetlabs/secure/keys/private_key.pkcs7.pem
+      pkcs7_public_key: /etc/puppetlabs/secure/keys/public_key.pkcs7.pem
+    paths:
+      - "nodes/%{trusted.certname}.yaml"
+      - "roles/%{trusted.extensions.pp_role}.yaml"
+      - "os/%{facts.os.name}-%{facts.os.release.full}.yaml"
+      - "os/%{facts.os.name}-%{facts.os.release.major}.yaml"
+      - "common.yaml"

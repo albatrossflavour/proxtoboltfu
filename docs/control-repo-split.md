@@ -71,7 +71,85 @@ Bolt's day-2 plans read configuration from running infrastructure
 
 ---
 
-## Implementation Steps
+## Pre-Implementation Checklist
+
+Before starting the control repo split, verify:
+
+- [ ] **Eyaml keys are deployed to PE server:**
+
+  - Check: `plans/build_pe.pp` lines 80-95 copy keys to `/etc/puppetlabs/secure/keys/`
+  - Verify on PE server: `ls -la /etc/puppetlabs/secure/keys/`
+  - Should see: `private_key.pkcs7.pem` and `public_key.pkcs7.pem` owned by `pe-puppet:pe-puppet`
+
+- [ ] **PE server is built and operational:**
+
+  - Can access PE console
+  - `puppet-code` command available
+  - Code Manager can be configured
+
+- [ ] **Git repository for control repo is ready:**
+
+  - GitHub/GitLab/Gitea/etc. repository created
+  - Deploy key can be added
+  - Repository URL known
+
+- [ ] **Current hiera data is documented:**
+  - Review `data/pe.yaml`, `data/scm.yaml`,
+    `data/cd4pe.yaml`, `data/nessus.yaml`, `data/common.yaml`
+  - Identify which values migrate to control repo roles
+  - Identify which values stay in Bolt for bootstrap
+
+**Key Understanding:**
+
+- **proxtoboltfu/hiera.yaml:** Relative paths (`keys/...`)
+- **control-repo/hiera.yaml:** Absolute paths (`/etc/puppetlabs/secure/keys/...`)
+- Keys are **already** on PE server at `/etc/puppetlabs/secure/keys/`
+  (deployed during `build_pe`)
+
+---
+
+## Implementation Steps Overview
+
+**Phase 1:** Bootstrap control repo from puppetlabs template (~15 min)
+
+- Clone template, configure git remote
+
+**Phase 2:** Copy files and create role-based hiera (~30 min)
+
+- Copy manifests, site-modules, scripts from proxtoboltfu
+- Create Puppetfile for Puppet modules (NOT Bolt modules)
+- Create hiera.yaml with **absolute paths** to eyaml keys
+- Migrate data to role-based structure (`data/roles/`)
+
+**Phase 3:** Commit and push (~5 min)
+
+- Initial commit, create production branch
+
+**Phase 4:** Configure Code Manager in PE (~20 min)
+
+- Generate deploy key, configure PE console
+- Set up RBAC token
+
+**Phase 5:** Deploy control repo via Code Manager (~10 min)
+
+- Run `puppet-code deploy production --wait`
+- Verify deployment, test agent classification
+
+**Phase 6:** Update proxtoboltfu repository (~20 min)
+
+- Move control repo files to `control-repo-template/`
+- Clean bootstrap hiera (remove migrated values)
+- Update documentation
+
+**Phase 7:** Configure day-2 operations (~30 min)
+
+- Create `tasks/get_pe_config.sh` to read from live infrastructure
+- Update upgrade plans to use live config (NOT Bolt hiera)
+- Document operational procedures
+
+**Total time:** ~2 hours
+
+---
 
 ### Phase 1: Bootstrap Control Repo from Template
 
@@ -177,6 +255,12 @@ Analysis needed:
 Update the hiera.yaml to follow best practices using trusted
 facts for role-based lookups:
 
+**IMPORTANT:** Control repo hiera.yaml uses absolute paths to
+eyaml keys because it will be deployed by Code Manager to
+`/etc/puppetlabs/code/environments/`. The keys are already
+copied to `/etc/puppetlabs/secure/keys/` during PE build
+(see `plans/build_pe.pp`).
+
 ```bash
 cat > hiera.yaml <<'EOF'
 ---
@@ -190,8 +274,8 @@ hierarchy:
   - name: 'Eyaml hierarchy'
     lookup_key: eyaml_lookup_key
     options:
-      pkcs7_private_key: keys/private_key.pkcs7.pem
-      pkcs7_public_key: keys/public_key.pkcs7.pem
+      pkcs7_private_key: /etc/puppetlabs/secure/keys/private_key.pkcs7.pem
+      pkcs7_public_key: /etc/puppetlabs/secure/keys/public_key.pkcs7.pem
     paths:
       - "nodes/%{trusted.certname}.yaml"
       - "roles/%{trusted.extensions.pp_role}.yaml"
@@ -206,6 +290,13 @@ Hierarchy structure:
 2. Per-role data: `data/roles/<pp_role>.yaml` (uses trusted
    extension from CSR)
 3. Common data (lowest priority): `data/common.yaml`
+
+**Key paths explained:**
+
+- **proxtoboltfu/hiera.yaml:** Uses relative path `keys/private_key.pkcs7.pem`
+  (Bolt reads from local checkout)
+- **control-repo/hiera.yaml:** Uses absolute path `/etc/puppetlabs/secure/keys/private_key.pkcs7.pem`
+  (deployed to PE server)
 
 #### 2.4 Create Role-Based Hiera Data Files
 
@@ -548,6 +639,7 @@ cp keys/public_key.pkcs7.pem \
   control-repo-template/keys/
 
 # Create template hiera.yaml with role-based hierarchy
+# NOTE: Uses ABSOLUTE paths because it will be deployed by Code Manager
 cat > control-repo-template/hiera.yaml <<'EOF'
 ---
 version: 5
@@ -560,8 +652,8 @@ hierarchy:
   - name: 'Eyaml hierarchy'
     lookup_key: eyaml_lookup_key
     options:
-      pkcs7_private_key: keys/private_key.pkcs7.pem
-      pkcs7_public_key: keys/public_key.pkcs7.pem
+      pkcs7_private_key: /etc/puppetlabs/secure/keys/private_key.pkcs7.pem
+      pkcs7_public_key: /etc/puppetlabs/secure/keys/public_key.pkcs7.pem
     paths:
       - "nodes/%{trusted.certname}.yaml"
       - "roles/%{trusted.extensions.pp_role}.yaml"
