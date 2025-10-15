@@ -12,9 +12,8 @@ plan proxtoboltfu::bootstrap_control_repo (
   out::message("")
 
   # Lookup configuration from hiera
-  $pe_config = lookup('peadm::config', Hash, first, undef)
-  $github_username = $pe_config['github_username']
-  $control_repo_name = $pe_config['control_repo_name']
+  $github_username = lookup('pe_github_username', String, first, undef)
+  $control_repo_name = lookup('pe_control_repo_name', String, first, undef)
 
   unless $github_username and $control_repo_name {
     fail_plan("github_username and control_repo_name must be set in peadm::config")
