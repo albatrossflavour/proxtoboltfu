@@ -7,10 +7,10 @@
 class profile::pe::nessus (
   $nessus_path = '/opt/nessus',
   $nessus_base_url = 'https://www.tenable.com/downloads/api/v2/pages/nessus/files',
-  $nessus_package = 'Nessus-10.9.0-ubuntu1604_amd64.deb',
+  $nessus_package = 'Nessus-10.10.0-ubuntu1604_amd64.deb',
   $nessus_server = 'new-nessus.albatrossflavour.com',
   $nessus_scan_name = 'patches',
-  $nessus_package_checksum = '4e87cc0a4036b02fa55e008eb2986404',
+  $nessus_package_checksum = '35b023fa315cba66bc60a47761851b50',
 ){
 
   file { $nessus_path:

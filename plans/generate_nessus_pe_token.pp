@@ -1,7 +1,9 @@
 # @summary Generate PE RBAC token for Nessus Transformer
 # @param regenerate Whether to regenerate token even if one exists (default: false)
+# @param commit_changes Whether to git commit and push the updated nessus.yaml (default: false)
 plan proxtoboltfu::generate_nessus_pe_token (
-  Boolean $regenerate = false
+  Boolean $regenerate = false,
+  Boolean $commit_changes = false
 ) {
 
   out::message("Checking for existing Nessus Transformer PE token...")
@@ -119,8 +121,27 @@ plan proxtoboltfu::generate_nessus_pe_token (
   out::message("✓ Nessus Transformer PE token generated and stored successfully")
   out::message("  Token stored in: data/nessus.yaml (eyaml encrypted)")
 
+  # Commit and push changes if requested
+  if $commit_changes {
+    out::message("  Committing changes to git...")
+
+    $git_commit = run_command(
+      "git add ${nessus_yaml_path} && git commit -m \"Update Nessus PE token\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\" && git push",
+      'localhost',
+      '_run_as' => system::env('USER'),
+      '_catch_errors' => true
+    )
+
+    unless $git_commit.ok {
+      fail_plan("Failed to commit changes: ${git_commit.first.error}")
+    }
+
+    out::message("  ✓ Changes committed and pushed to git")
+  }
+
   return {
     status => 'completed',
-    token_file => $nessus_yaml_path
+    token_file => $nessus_yaml_path,
+    committed => $commit_changes
   }
 }

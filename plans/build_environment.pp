@@ -45,8 +45,22 @@ plan proxtoboltfu::build_environment (
 
   if !$nessus_check_data.empty {
     out::message("Step 2.5: Generating Nessus PE token...")
-    run_plan('proxtoboltfu::generate_nessus_pe_token', 'regenerate' => true)
-    out::message("✓ Nessus PE token generated")
+    run_plan('proxtoboltfu::generate_nessus_pe_token', 'regenerate' => true, 'commit_changes' => true)
+    out::message("✓ Nessus PE token generated and committed")
+
+    out::message("  Deploying production code to PE...")
+    $code_deploy = run_command(
+      'puppet-code deploy production --wait',
+      'localhost',
+      '_run_as' => system::env('USER'),
+      '_catch_errors' => true
+    )
+
+    unless $code_deploy.ok {
+      fail_plan("Failed to deploy production code: ${code_deploy.first.error}")
+    }
+
+    out::message("✓ Production code deployed")
     out::message("")
   }
 
