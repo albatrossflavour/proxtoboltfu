@@ -1,9 +1,0 @@
-x 2025-10-10 Update hiera.yaml to support separate config files +config
-x 2025-10-10 Fix destroy provisioner in clients.tf to use bolt with --targets +bugfix
-x 2025-10-10 Add idempotency checks to all build plans +quality
-x 2025-10-10 Move PE config from common.yaml to pe.yaml +config
-x 2025-10-10 Create wrapper plans for SCM and CD4PE config generation +automation
-x 2025-10-10 Update build plans to use config generation +infrastructure
-x 2025-10-10 Create destroy_environment plan +automation
-x 2025-10-10 Replace terraform references with tofu in comments +cleanup
-x 2025-10-12 Create bootstap task +release

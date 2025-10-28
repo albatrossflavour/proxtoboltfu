@@ -717,6 +717,21 @@ ls -la keys/
 - **Bootstrap** before first agent run, **destroy** when tearing down
 - **Token generation** works with both repos - detects which one to update
 
+## Task Management
+
+This project uses **OmniFocus** for task tracking via the MCP OmniFocus integration. Tasks are stored in the **proxtoboltfu** project within the "Puppet Tech Stuff" folder.
+
+**Task Tags:**
+- `<Code>` - Code implementation tasks
+- `<Admin>` - Documentation and administrative tasks
+- `<Research>` - Investigation and research tasks
+
+**Integration:**
+- Claude Code can read, create, and update OmniFocus tasks
+- High-priority tasks are flagged in OmniFocus
+- Tasks are organized by project context
+- No local .todo.txt files - OmniFocus is the single source of truth
+
 ## Working Principles
 
 ### Problem Solving Approach
