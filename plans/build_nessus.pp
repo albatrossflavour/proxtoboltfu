@@ -1,5 +1,5 @@
 # @summary Install and configure Nessus vulnerability scanner server
-plan proxtoboltfu::build_nessus {
+plan igor::build_nessus {
 
   # Lookup config from hiera
   $config = lookup('nessus::config', Hash, first, undef)
@@ -30,7 +30,7 @@ plan proxtoboltfu::build_nessus {
 
   if $check_puppet.ok {
     out::message("✓ Puppet already installed on ${targets}, skipping installation")
-    return { status => 'already_installed' }
+    return({ status => 'already_installed' })
   }
 
   out::message("Puppet not found, proceeding with installation...")
@@ -71,5 +71,5 @@ plan proxtoboltfu::build_nessus {
 
   out::message("Nessus build completed successfully")
 
-  return { status => 'completed' }
+  return({ status => 'completed' })
 }

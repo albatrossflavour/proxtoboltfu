@@ -1,5 +1,5 @@
 # @summary Install and configure metrics dashboard server with Grafana
-plan proxtoboltfu::build_dashboard {
+plan igor::build_dashboard {
 
   # Lookup config from hiera
   $config = lookup('dashboard::config', Hash, first, undef)
@@ -33,7 +33,7 @@ plan proxtoboltfu::build_dashboard {
 
   if $check_puppet.ok {
     out::message("✓ Puppet already installed on ${targets}, skipping installation")
-    return { status => 'already_installed' }
+    return({ status => 'already_installed' })
   }
 
   out::message("Puppet not found, proceeding with installation...")
@@ -81,5 +81,5 @@ plan proxtoboltfu::build_dashboard {
   out::message("Dashboard build completed successfully")
   out::message("Grafana admin password: ${grafana_admin_password}")
 
-  return { status => 'completed' }
+  return({ status => 'completed' })
 }

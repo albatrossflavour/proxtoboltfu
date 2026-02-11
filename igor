@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+#
+# igor - Bootstrap and manage an Igor Puppet Enterprise demo environment
+#
+# Usage:
+#   ./igor setup     - Interactive first-time configuration
+#   ./igor deploy    - Deploy the full environment
+#   ./igor destroy   - Tear down the full environment
+#   ./igor reset     - Remove all generated config (back to clean clone)
+#   ./igor preflight - Validate prerequisites
+#   ./igor status    - Show environment status
+#   ./igor help      - Show this help
+#
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+banner() {
+	echo ""
+	echo -e "${BLUE}  _                  ${NC}"
+	echo -e "${BLUE} (_) __ _  ___  _ __ ${NC}"
+	echo -e "${BLUE} | |/ _\` |/ _ \\| '__|${NC}"
+	echo -e "${BLUE} | | (_| | (_) | |   ${NC}"
+	echo -e "${BLUE} |_|\\__, |\\___/|_|   ${NC}"
+	echo -e "${BLUE}    |___/            ${NC}"
+	echo ""
+}
+
+info() { echo -e "${GREEN}[info]${NC}  $*"; }
+warn() { echo -e "${YELLOW}[warn]${NC}  $*"; }
+error() { echo -e "${RED}[error]${NC} $*"; }
+
+check_bolt() {
+	if ! command -v bolt &>/dev/null; then
+		error "Bolt is not installed."
+		echo "  Install: https://www.puppet.com/docs/bolt/latest/bolt_installing"
+		exit 1
+	fi
+}
+
+ensure_modules() {
+	if [ ! -d ".modules" ]; then
+		info "Installing Bolt modules (first run)..."
+		bolt module install
+		echo ""
+	fi
+}
+
+cmd_setup() {
+	banner
+	info "Starting Igor setup wizard..."
+	echo ""
+
+	check_bolt
+
+	# For setup, we need modules installed first so the plan can run.
+	# But we do a lightweight install - setup.pp will re-run it anyway.
+	ensure_modules
+
+	bolt plan run igor::setup "$@"
+}
+
+cmd_deploy() {
+	banner
+	info "Deploying Igor environment..."
+	echo ""
+
+	check_bolt
+	ensure_modules
+
+	bolt plan run igor::deploy "$@"
+}
+
+cmd_destroy() {
+	banner
+	warn "Destroying Igor environment..."
+	echo ""
+
+	check_bolt
+	ensure_modules
+
+	bolt plan run igor::destroy_environment "$@"
+}
+
+cmd_reset() {
+	banner
+	warn "Resetting Igor configuration..."
+	echo ""
+
+	check_bolt
+
+	# Reset doesn't need modules - it just deletes files.
+	# But Bolt needs to parse the plan, which requires module resolution.
+	ensure_modules
+
+	bolt plan run igor::reset "$@"
+}
+
+cmd_preflight() {
+	banner
+	info "Running preflight checks..."
+	echo ""
+
+	check_bolt
+	ensure_modules
+
+	bolt plan run igor::preflight "$@"
+}
+
+cmd_status() {
+	banner
+	info "Checking environment status..."
+	echo ""
+
+	check_bolt
+	ensure_modules
+
+	bolt plan run igor::status "$@"
+}
+
+cmd_help() {
+	banner
+	echo "Usage: ./igor <command> [options]"
+	echo ""
+	echo "Commands:"
+	echo "  setup      Interactive first-time configuration"
+	echo "             Options: reconfigure=true  (overwrite existing config)"
+	echo ""
+	echo "  deploy     Deploy the full Puppet Enterprise environment"
+	echo "             Options: apply_terraform=false  (skip VM provisioning)"
+	echo ""
+	echo "  destroy    Tear down the entire environment"
+	echo "             Options: confirm=true  (required to actually destroy)"
+	echo ""
+	echo "  reset      Remove all generated config files"
+	echo "             Options: confirm=true  (required to actually delete)"
+	echo ""
+	echo "  preflight  Validate all prerequisites before deployment"
+	echo ""
+	echo "  status     Show current environment status"
+	echo ""
+	echo "  help       Show this help message"
+	echo ""
+	echo "Typical workflow:"
+	echo "  1. ./igor setup          # Configure everything"
+	echo "  2. ./igor preflight      # Verify prerequisites"
+	echo "  3. ./igor deploy         # Build the environment"
+	echo ""
+	echo "To start over:"
+	echo "  ./igor destroy confirm=true   # Tear down VMs"
+	echo "  ./igor reset confirm=true     # Remove config files"
+	echo "  ./igor setup                  # Reconfigure"
+	echo ""
+}
+
+# Main dispatch
+case "${1:-help}" in
+setup)
+	shift
+	cmd_setup "$@"
+	;;
+deploy)
+	shift
+	cmd_deploy "$@"
+	;;
+destroy)
+	shift
+	cmd_destroy "$@"
+	;;
+reset)
+	shift
+	cmd_reset "$@"
+	;;
+preflight)
+	shift
+	cmd_preflight "$@"
+	;;
+status)
+	shift
+	cmd_status "$@"
+	;;
+help | -h | --help) cmd_help ;;
+*)
+	error "Unknown command: $1"
+	echo ""
+	cmd_help
+	exit 1
+	;;
+esac

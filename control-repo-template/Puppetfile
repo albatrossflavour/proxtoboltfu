@@ -1,7 +1,7 @@
 forge 'https://forge.puppet.com'
 
 # NOTE: This is the control repo Puppetfile (for agent configuration)
-# For Bolt modules, see proxtoboltfu/Puppetfile
+# For Bolt modules, see igor/Puppetfile
 
 # Core Puppet modules
 mod 'puppetlabs/stdlib', '9.7.0'

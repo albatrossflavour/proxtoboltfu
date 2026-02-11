@@ -2,7 +2,7 @@
 # @param regenerate Whether to regenerate token even if one exists (default: false)
 # @param commit_changes Whether to git commit and push the updated nessus.yaml (default: false)
 # @param work_dir Directory containing control repo (default: ~/dev)
-plan proxtoboltfu::generate_nessus_pe_token (
+plan igor::generate_nessus_pe_token (
   Boolean $regenerate = false,
   Boolean $commit_changes = false,
   String $work_dir = '~/dev'
@@ -16,7 +16,7 @@ plan proxtoboltfu::generate_nessus_pe_token (
   # Check if we should skip generation
   if $existing_token and $existing_token != '~' and !$regenerate {
     out::message("✓ Nessus Transformer PE token already exists (use regenerate=true to force regeneration)")
-    return { status => 'skipped', reason => 'token_exists' }
+    return({ status => 'skipped', reason => 'token_exists' })
   }
 
   if $regenerate {
@@ -84,8 +84,7 @@ plan proxtoboltfu::generate_nessus_pe_token (
   out::message("  ✓ Token encrypted successfully")
 
   # Determine where to write the token
-  # Extract control repo name from r10k_remote
-  $pe_params = lookup('peadm::config', Hash, first, undef)
+  # Extract control repo name from r10k_remote (using $pe_params from line 29)
   $repo_url = $pe_params['r10k_remote']
   $url_parts = split($repo_url, '/')
   $repo_name_with_ext = $url_parts[-1]
@@ -119,7 +118,7 @@ plan proxtoboltfu::generate_nessus_pe_token (
   } else {
     $nessus_yaml_path = 'data/roles/role::pe::nessus.yaml'
     $use_control_repo = false
-    out::message("  Updating proxtoboltfu: ${nessus_yaml_path}...")
+    out::message("  Updating igor: ${nessus_yaml_path}...")
   }
 
   # Write encrypted token to temp file to avoid shell escaping issues
@@ -198,7 +197,7 @@ plan proxtoboltfu::generate_nessus_pe_token (
 
       out::message("  ✓ Code deployed via Code Manager")
     } else {
-      # Working in proxtoboltfu
+      # Working in igor
       $git_commit = run_command(
         "git add ${nessus_yaml_path} && git commit -m \"Update Nessus PE token\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\" && git push",
         'localhost',
@@ -210,14 +209,14 @@ plan proxtoboltfu::generate_nessus_pe_token (
         fail_plan("Failed to commit changes: ${git_commit.first.error}")
       }
 
-      out::message("  ✓ Changes committed and pushed to proxtoboltfu")
+      out::message("  ✓ Changes committed and pushed to igor")
     }
   }
 
-  return {
+  return({
     status => 'completed',
     token_file => $nessus_yaml_path,
     committed => $commit_changes,
     control_repo => $use_control_repo
-  }
+  })
 }

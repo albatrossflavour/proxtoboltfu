@@ -1,5 +1,5 @@
 # @summary Install and configure Puppet Enterprise master server
-plan proxtoboltfu::build_pe {
+plan igor::build_pe {
 
   $params = lookup('peadm::config', Hash, first, undef)
 
@@ -22,7 +22,7 @@ plan proxtoboltfu::build_pe {
 
   if $check_puppet.ok {
     out::message("✓ Puppet already installed on ${targets}, skipping installation")
-    return { status => 'already_installed' }
+    return({ status => 'already_installed' })
   }
 
   out::message("Puppet not found, proceeding with installation...")
@@ -57,7 +57,7 @@ plan proxtoboltfu::build_pe {
     out::message("Warning: No pe_license_content found in hiera")
   }
 
-  run_plan('proxtoboltfu::bootstrap_control_repo',
+  run_plan('igor::bootstrap_control_repo',
     'push' => true
   )
 
@@ -114,12 +114,12 @@ plan proxtoboltfu::build_pe {
   )
 
   # Download CA certificate
-  run_plan('proxtoboltfu::fetch_ca_cert')
+  run_plan('igor::fetch_ca_cert')
 
   # Generate PE access token
-  run_plan('proxtoboltfu::puppet_access_login')
+  run_plan('igor::puppet_access_login')
 
   out::message("Puppet Enterprise build completed successfully")
 
-  return { status                                                                        => 'completed' }
+  return({ status => 'completed' })
 }

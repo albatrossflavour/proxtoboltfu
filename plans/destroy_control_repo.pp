@@ -1,7 +1,7 @@
 # @summary Destroy control repo (delete GitHub repo and local directory)
 # @param work_dir Directory containing control repo (default: ~/dev)
 # @param confirm Whether to actually delete (default: false - dry run)
-plan proxtoboltfu::destroy_control_repo (
+plan igor::destroy_control_repo (
   String $work_dir = '~/dev',
   Boolean $confirm = false
 ) {
@@ -41,14 +41,14 @@ plan proxtoboltfu::destroy_control_repo (
     out::message("  2. Delete local directory: ${repo_path}")
     out::message("")
     out::message("To actually delete, run with confirm=true:")
-    out::message("  bolt plan run proxtoboltfu::destroy_control_repo confirm=true")
+    out::message("  bolt plan run igor::destroy_control_repo confirm=true")
     out::message("")
 
-    return {
+    return({
       status => 'dry_run',
       repo_url => $repo_url,
       local_path => $repo_path
-    }
+    })
   }
 
   out::message("⚠ CONFIRM=TRUE - Deleting control repo resources")
@@ -111,9 +111,9 @@ plan proxtoboltfu::destroy_control_repo (
   out::message("")
   out::message("=== Control Repo Destroyed ===")
 
-  return {
+  return({
     status => 'completed',
     repo_url => $repo_url,
     local_path => $repo_path
-  }
+  })
 }

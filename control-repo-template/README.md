@@ -8,11 +8,11 @@ This directory contains template files for bootstrapping the Puppet control repo
 - `hiera.yaml` - Hiera configuration with absolute paths to eyaml keys
 - `data/` - Role-based hiera data structure (created by bootstrap plan)
 
-## Key Differences from proxtoboltfu
+## Key Differences from igor
 
 ### Puppetfile
 
-**proxtoboltfu/Puppetfile:**
+**igor/Puppetfile:**
 
 - Contains Bolt modules (peadm, complyadm, cd4peadm)
 - Installed to `.modules/`
@@ -26,7 +26,7 @@ This directory contains template files for bootstrapping the Puppet control repo
 
 ### hiera.yaml
 
-**proxtoboltfu/hiera.yaml:**
+**igor/hiera.yaml:**
 
 - Relative paths: `keys/private_key.pkcs7.pem`
 - Used by Bolt from local checkout
@@ -42,13 +42,13 @@ This directory contains template files for bootstrapping the Puppet control repo
 The `bootstrap_control_repo` plan automatically uses these templates:
 
 ```bash
-bolt plan run proxtoboltfu::bootstrap_control_repo
+bolt plan run igor::bootstrap_control_repo
 ```
 
 This creates a new control repo at `~/dev/puppet-control-repo` with:
 
 - Template files from this directory
-- manifests/site-modules/scripts from proxtoboltfu
+- manifests/site-modules/scripts from igor
 - Role-based data structure
 
 ## Manual Updates

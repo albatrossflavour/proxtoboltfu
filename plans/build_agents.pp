@@ -1,13 +1,13 @@
 # @summary Build puppet agent clients
-plan proxtoboltfu::build_agents {
+plan igor::build_agents {
 
   # Get puppet server from peadm config
   $peadm_config = lookup('peadm::config', Hash, first, undef)
   $puppet_server = $peadm_config['primary_host']
 
   # Get fresh inventory from tofu state
-  $agent_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
-    'dir' => 'tf',
+  $agent_inventory = run_task('igor::tofu_inventory', 'localhost',
+    'provider' => 'proxmox',
     'tag_filter' => 'puppetagents'
   )
 
@@ -16,7 +16,7 @@ plan proxtoboltfu::build_agents {
 
   if $agent_targets.empty {
     out::message("No agent nodes found in tofu state")
-    return { status => 'no_agents', agent_count => 0 }
+    return({ status => 'no_agents', agent_count => 0 })
   }
 
   out::message("Building Puppet Agents")
@@ -67,8 +67,8 @@ plan proxtoboltfu::build_agents {
   out::message("Agent build completed successfully")
   out::message("Built ${agent_targets.length} agents")
 
-  return {
+  return({
     status => 'completed',
     agent_count => $agent_targets.length
-  }
+  })
 }

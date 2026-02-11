@@ -1,38 +1,50 @@
-# proxtoboltfu Project Structure
+# Igor Project Structure
 
 ## Overview
 
-This project uses OpenTofu (Terraform) to provision Proxmox VMs, Pihole for DNS management, and Puppet Bolt to configure infrastructure. The design separates infrastructure provisioning from configuration management for clean, predictable deployments.
+Igor (formerly proxtoboltfu) uses OpenTofu (Terraform) to provision infrastructure VMs, Pihole for DNS management, and Puppet Bolt to configure infrastructure. The design separates infrastructure provisioning from configuration management for clean, predictable deployments. Infrastructure providers are abstracted behind a contract interface, with Proxmox as the current implementation.
 
 ## Directory Structure
 
 ```text
-proxtoboltfu/
+igor/
+├── igor                          # Bootstrap wrapper script (setup/deploy/destroy/reset)
 ├── tf/                           # OpenTofu/Terraform configuration
-│   ├── puppet.tf                 # Puppet Enterprise server (VMID 999)
-│   ├── scm.tf                    # SCM/Comply server (VMID 998)
-│   ├── cd4pe.tf                  # CD4PE server (VMID 997)
-│   ├── dashboard.tf              # Dashboard server (VMID 996)
-│   ├── nessus.tf                 # Nessus scanner (VMID 995)
-│   ├── clients.tf                # Puppet agent clients (dynamic count)
-│   ├── provider.tf               # Proxmox and Pihole providers
-│   └── variables.tf              # Variable definitions
+│   └── providers/                # Provider implementations
+│       ├── _contract/            # Provider contract documentation
+│       │   └── README.md         # Required outputs specification
+│       └── proxmox/              # Proxmox provider implementation
+│           ├── puppet.tf         # Puppet Enterprise server (VMID 999)
+│           ├── scm.tf            # SCM/Comply server (VMID 998)
+│           ├── cd4pe.tf          # CD4PE server (VMID 997)
+│           ├── dashboard.tf      # Dashboard server (VMID 996)
+│           ├── nessus.tf         # Nessus scanner (VMID 995)
+│           ├── clients.tf        # Puppet agent clients (dynamic count)
+│           ├── outputs.tf        # Standardized outputs (bolt_inventory, provider_info, client_resource_addresses)
+│           ├── provider.tf       # Proxmox and Pihole providers
+│           └── variables.tf      # Variable definitions
 ├── plans/                        # Puppet Bolt plans
-│   ├── build_environment.pp      # Orchestrate full stack build
+│   ├── setup.pp                  # Interactive first-time configuration wizard
+│   ├── deploy.pp                 # Orchestrate full stack build (with preflight)
+│   ├── reset.pp                  # Remove all generated config (back to clean clone)
+│   ├── preflight.pp              # Validate prerequisites before deployment
 │   ├── build_pe.pp               # Build Puppet Enterprise server
 │   ├── build_scm.pp              # Build SCM server
 │   ├── build_cd4pe.pp            # Build CD4PE server
 │   ├── build_dashboard.pp        # Build Dashboard server
 │   ├── build_nessus.pp           # Build Nessus scanner
 │   ├── build_agents.pp           # Build Puppet agent clients
-│   ├── destroy_clients.pp        # Destroy agent clients with PE purge
-│   ├── bootstrap_control_repo.pp # Create and push control repo to GitHub
+│   ├── destroy_agents.pp         # Destroy agent clients with PE purge
+│   ├── destroy_environment.pp    # Destroy full environment
+│   ├── bootstrap_control_repo.pp # Create/update control repo on GitHub
 │   ├── destroy_control_repo.pp   # Delete control repo from GitHub and local
 │   ├── generate_nessus_pe_token.pp # Generate PE RBAC token for Nessus
+│   ├── configure_client_tools.pp # Configure local Puppet client tools
 │   ├── fetch_ca_cert.pp          # Download CA cert from PE server
-│   └── puppet_access_login.pp    # Login to PE console
+│   ├── puppet_access_login.pp    # Login to PE console
+│   └── status.pp                 # Show infrastructure status
 ├── tasks/                        # Bolt tasks
-│   ├── tofu_inventory.sh         # Dynamic inventory from Terraform state
+│   ├── tofu_inventory.sh         # Dynamic inventory from Terraform outputs (jq-based)
 │   └── tofu_inventory.json       # Task metadata
 ├── data/                         # Hiera data
 │   ├── common.yaml               # Minimal common configuration
@@ -67,8 +79,8 @@ proxtoboltfu/
 
 This project maintains a clear separation between infrastructure provisioning and configuration management:
 
-**Infrastructure Provisioning (proxtoboltfu):**
-- Uses OpenTofu to provision VMs on Proxmox
+**Infrastructure Provisioning (igor):**
+- Uses OpenTofu to provision VMs via provider abstraction (currently Proxmox)
 - Creates DNS records in Pihole
 - Manages VM lifecycle
 - Uses Puppet Bolt to build/configure infrastructure servers
@@ -82,7 +94,7 @@ This project maintains a clear separation between infrastructure provisioning an
 - Contains manifests, site-modules, Puppetfile for agent-side modules
 
 **Key Distinction:**
-- **proxtoboltfu** = Infrastructure automation (builds servers)
+- **igor** = Infrastructure automation (builds servers)
 - **puppet-control-repo** = Configuration management (configures agents)
 
 ### 2. Tag-Based Inventory
@@ -111,17 +123,17 @@ Tag filtering uses exact matching with boundaries to prevent substring matches (
 
 ### 3. Dynamic Inventory Task
 
-The `tofu_inventory` task reads Terraform state and returns targets:
+The `tofu_inventory` task reads Terraform outputs and returns targets using jq:
 
 ```bash
 # Get all infrastructure
-PT_dir=tf PT_tag_filter=puppetinfra ./tasks/tofu_inventory.sh
+PT_provider=proxmox PT_tag_filter=puppetinfra ./tasks/tofu_inventory.sh
 
 # Get only PE servers
-PT_dir=tf PT_tag_filter=puppet ./tasks/tofu_inventory.sh
+PT_provider=proxmox PT_tag_filter=puppet ./tasks/tofu_inventory.sh
 
 # Get all VMs (no filter)
-PT_dir=tf ./tasks/tofu_inventory.sh
+PT_provider=proxmox ./tasks/tofu_inventory.sh
 ```
 
 Returns JSON with targets including name, IP, and tags in vars:
@@ -131,25 +143,22 @@ Returns JSON with targets including name, IP, and tags in vars:
     {
       "name": "new-puppet.albatrossflavour.com",
       "uri": "192.168.10.100",
-      "vars": {"tags": "prod;puppet;puppetinfra;ubuntu"}
+      "vars": {"tags": "puppetinfra;puppet;prod;ubuntu"}
     }
   ]
 }
 ```
 
-The script handles multiple IP scenarios:
-- Static IPs: Extracted from `ipconfig0` parameter
-- DHCP: Falls back to using hostname for DNS resolution
-- Guest Agent: Uses `default_ipv4_address` if available from Proxmox guest agent
+The task uses `tofu output -json bolt_inventory` from the provider directory, with jq for tag filtering. Each provider must implement the `bolt_inventory` output per the contract in `tf/providers/_contract/README.md`.
 
 ### 4. Dual-Repository Hiera Architecture
 
 The project uses two separate repositories with different hiera configurations:
 
-#### proxtoboltfu Hiera (Bolt-side)
+#### Igor Hiera (Bolt-side)
 
 **Purpose:** Infrastructure builds where Bolt runs on localhost
-**Location:** `proxtoboltfu/hiera.yaml`
+**Location:** `igor/hiera.yaml`
 **Key Paths:** Relative (`keys/private_key.pkcs7.pem`)
 
 ```yaml
@@ -254,11 +263,11 @@ control-repo-template/
     └── os/                 # Empty (actual files copied at bootstrap)
 ```
 
-**Key differences from proxtoboltfu:**
+**Key differences from igor:**
 - Puppetfile contains only agent-side modules (no peadm, complyadm, cd4peadm)
 - hiera.yaml uses absolute paths (`/etc/puppetlabs/secure/keys/`)
 - hiera.yaml uses trusted facts and facts for dynamic lookups
-- Data files are placeholders - actual data copied from proxtoboltfu at bootstrap time
+- Data files are placeholders - actual data copied from igor at bootstrap time
 
 ### 6. DNS Integration
 
@@ -307,13 +316,37 @@ config:
 
 ## Deployment Workflow
 
-### Full Stack Deployment (Single Command)
+### Using the Wrapper Script (Recommended)
+
+The `./igor` wrapper script handles module installation and provides a streamlined interface:
 
 ```bash
-bolt plan run proxtoboltfu::build_environment
+# First time: configure everything interactively
+./igor setup
+
+# Verify prerequisites
+./igor preflight
+
+# Deploy the full environment
+./igor deploy
+
+# Tear down
+./igor destroy confirm=true
+
+# Reset config to clean state (back to fresh clone)
+./igor reset confirm=true
+```
+
+All `./igor` commands pass extra arguments through to the underlying Bolt plans.
+
+### Full Stack Deployment (Direct Bolt)
+
+```bash
+bolt plan run igor::deploy
 ```
 
 This orchestrates the complete deployment:
+0. Runs preflight validation checks
 1. Provisions infrastructure with OpenTofu (VMs + DNS)
 2. Builds Puppet Enterprise server
 3. Builds additional infrastructure (SCM, CD4PE, Dashboard, Nessus) in parallel
@@ -321,43 +354,48 @@ This orchestrates the complete deployment:
 
 To skip infrastructure provisioning (if VMs already exist):
 ```bash
-bolt plan run proxtoboltfu::build_environment apply_terraform=false
+bolt plan run igor::deploy apply_terraform=false
 ```
 
 ### Manual Step-by-Step Deployment
 
 If you prefer manual control:
 
-1. **Provision Infrastructure:**
+1. **Run Preflight Checks:**
    ```bash
-   cd tf
+   bolt plan run igor::preflight
+   ```
+
+2. **Provision Infrastructure:**
+   ```bash
+   cd tf/providers/proxmox
    tofu init
    tofu apply -parallelism=1
    ```
    This creates VMs and DNS records. All resources are in state.
    Serial execution prevents Pihole API session exhaustion.
 
-2. **Build Puppet Enterprise:**
+3. **Build Puppet Enterprise:**
    ```bash
-   bolt plan run proxtoboltfu::build_pe
+   bolt plan run igor::build_pe
    ```
 
-3. **Build Additional Infrastructure (can run in parallel):**
+4. **Build Additional Infrastructure (can run in parallel):**
    ```bash
-   bolt plan run proxtoboltfu::build_scm
-   bolt plan run proxtoboltfu::build_cd4pe
-   bolt plan run proxtoboltfu::build_dashboard
-   bolt plan run proxtoboltfu::build_nessus
+   bolt plan run igor::build_scm
+   bolt plan run igor::build_cd4pe
+   bolt plan run igor::build_dashboard
+   bolt plan run igor::build_nessus
    ```
 
-4. **Build Agent Nodes:**
+5. **Build Agent Nodes:**
    ```bash
-   bolt plan run proxtoboltfu::build_agents
+   bolt plan run igor::build_agents
    ```
 
 ### Managing Agent Clients
 
-**Client Configuration** (tf/terraform.tfvars):
+**Client Configuration** (tf/providers/proxmox/terraform.tfvars):
 ```hcl
 # OS Distribution Controls
 enable_alma        = false
@@ -383,17 +421,17 @@ With `enable_ubuntu=true`, `prod_clients=1`, `dev_clients=0`:
 
 **Deploy Clients:**
 ```bash
-cd tf && tofu apply -parallelism=1  # Create VMs
-bolt plan run proxtoboltfu::build_agents  # Configure agents
+cd tf/providers/proxmox && tofu apply -parallelism=1  # Create VMs
+bolt plan run igor::build_agents  # Configure agents
 ```
 
 **Destroy Clients:**
 ```bash
 # Preview what will be destroyed
-bolt plan run proxtoboltfu::destroy_clients
+bolt plan run igor::destroy_agents
 
 # Actually destroy (purges from PE, then destroys VMs)
-bolt plan run proxtoboltfu::destroy_clients confirm=true
+bolt plan run igor::destroy_agents confirm=true
 ```
 
 The destroy process automatically:
@@ -452,7 +490,7 @@ Creates the puppet-control-repo from the r10k_remote configuration:
 
 ```bash
 # Create and push control repo to GitHub
-bolt plan run proxtoboltfu::bootstrap_control_repo push=true
+bolt plan run igor::bootstrap_control_repo push=true
 ```
 
 **What it does:**
@@ -460,14 +498,15 @@ bolt plan run proxtoboltfu::bootstrap_control_repo push=true
 2. Creates GitHub repository using `gh` CLI
 3. Clones puppetlabs/control-repo template
 4. Copies manifests, site-modules, scripts from `control-repo-template/`
-5. Copies current hiera data from `proxtoboltfu/data/` (with generated values)
+5. Copies current hiera data from `igor/data/` (with generated values)
 6. Creates production and development branches
 7. Leaves repo checked out on production branch
 8. Pushes both branches to GitHub
 
-**Safety features:**
-- Checks if local directory exists first
-- Requires `overwrite=true` to remove existing directory
+**Idempotent behavior:**
+- If directory exists with correct remote: pulls latest, copies updated files, commits+pushes if changed
+- If directory exists with wrong remote: fails unless `overwrite=true`
+- If directory doesn't exist: full bootstrap
 - Auto-creates GitHub repo if it doesn't exist
 
 **Parameters:**
@@ -481,10 +520,10 @@ Removes the control repository from GitHub and local filesystem:
 
 ```bash
 # Dry run - shows what would be deleted
-bolt plan run proxtoboltfu::destroy_control_repo
+bolt plan run igor::destroy_control_repo
 
 # Actually delete
-bolt plan run proxtoboltfu::destroy_control_repo confirm=true
+bolt plan run igor::destroy_control_repo confirm=true
 ```
 
 **What it does:**
@@ -502,14 +541,14 @@ bolt plan run proxtoboltfu::destroy_control_repo confirm=true
 Generates and stores PE RBAC token for Nessus Transformer:
 
 ```bash
-# Generate token (writes to control repo if it exists, otherwise proxtoboltfu)
-bolt plan run proxtoboltfu::generate_nessus_pe_token commit_changes=true regenerate=false
+# Generate token (writes to control repo if it exists, otherwise igor)
+bolt plan run igor::generate_nessus_pe_token commit_changes=true regenerate=false
 ```
 
 **Smart token placement:**
 - Checks if control repo exists locally
 - If yes: writes to `control-repo/data/roles/role::pe::nessus.yaml`
-- If no: writes to `proxtoboltfu/data/roles/role::pe::nessus.yaml`
+- If no: writes to `igor/data/roles/role::pe::nessus.yaml`
 - Ensures production branch is checked out before writing to control repo
 
 **Parameters:**
@@ -539,9 +578,9 @@ To add a new type of infrastructure (e.g., compilers):
    - name: puppet-compilers
      targets:
        _plugin: task
-       task: proxtoboltfu::tofu_inventory
+       task: igor::tofu_inventory
        parameters:
-         dir: tf
+         provider: proxmox
          tag_filter: compiler
    ```
 
@@ -619,10 +658,10 @@ Tags are extensible - use semicolon-separated values and filter on any tag.
 **Current approach:** Separate repos with distinct purposes.
 
 **Benefits:**
-- **proxtoboltfu**: Infrastructure builds, uses Bolt, includes build modules
+- **igor**: Infrastructure builds, uses Bolt, includes build modules
 - **puppet-control-repo**: Agent config, uses Code Manager, excludes build modules
 - Each repo has appropriate hiera configuration:
-  - proxtoboltfu: Explicit file listing (no trusted facts)
+  - igor: Explicit file listing (no trusted facts)
   - control-repo: Trusted facts and facts-based hierarchy
 - Eyaml keys in correct locations for each use case
 - Agent changes don't affect infrastructure code
@@ -630,10 +669,11 @@ Tags are extensible - use semicolon-separated values and filter on any tag.
 - Single source of truth via r10k_remote
 
 **Implementation details:**
-- Bootstrap plan copies current data from proxtoboltfu (with generated values)
+- Bootstrap plan copies current data from igor (with generated values)
+- Bootstrap is idempotent — re-running updates existing repo without `overwrite=true`
 - Token generation intelligently detects which repo to update
 - Both repos use same role-based structure (different hiera lookups)
-- Control repo created on demand, not checked into proxtoboltfu
+- Control repo created on demand, not checked into igor
 
 ## Troubleshooting
 
@@ -641,10 +681,10 @@ Tags are extensible - use semicolon-separated values and filter on any tag.
 
 ```bash
 # Check what the task returns
-PT_dir=tf ./tasks/tofu_inventory.sh
+PT_provider=proxmox ./tasks/tofu_inventory.sh
 
 # Check specific filter
-PT_dir=tf PT_tag_filter=puppet ./tasks/tofu_inventory.sh
+PT_provider=proxmox PT_tag_filter=puppet ./tasks/tofu_inventory.sh
 
 # View Bolt's interpretation
 bolt inventory show --detail
@@ -679,20 +719,20 @@ ls -la keys/
 
 ### How Everything Connects
 
-**Infrastructure Build Flow (proxtoboltfu):**
-1. **Terraform** creates VMs with tags, IPs, and DNS records
-2. **Terraform state** stores resource information
-3. **tofu_inventory task** reads state, filters by tags, returns targets
+**Infrastructure Build Flow (igor):**
+1. **Terraform** creates VMs with tags, IPs, and DNS records via provider (e.g., Proxmox)
+2. **Terraform outputs** expose `bolt_inventory`, `provider_info`, `client_resource_addresses`
+3. **tofu_inventory task** reads outputs via `tofu output -json`, filters by tags with jq
 4. **inventory.yaml** uses task plugin to populate groups dynamically
-5. **Bolt plans** lookup config from **proxtoboltfu hiera** (data/roles/*.yaml)
+5. **Bolt plans** lookup config from **igor hiera** (data/roles/*.yaml)
 6. **Hiera** resolves hostnames that match **DNS records** created by Terraform
 7. **Plans** use `get_targets()` which resolves via **inventory groups**
 8. **Plans** configure infrastructure servers using Bolt modules (peadm, complyadm, etc.)
 
 **Control Repo Flow (puppet-control-repo):**
 1. **bootstrap_control_repo** plan extracts location from r10k_remote
-2. Creates GitHub repo and clones puppetlabs template
-3. Copies current data from **proxtoboltfu/data/** (preserves generated values)
+2. Creates GitHub repo and clones puppetlabs template (or updates existing)
+3. Copies current data from **igor/data/** (preserves generated values)
 4. Pushes to GitHub with production and development branches
 5. **Code Manager** on PE server deploys from r10k_remote
 6. **Agents** connect to PE server and fetch catalog
@@ -709,17 +749,19 @@ ls -la keys/
 
 - **Never** hardcode IPs or hostnames in plans - use hiera
 - **Always** tag VMs appropriately in Terraform
-- **Test** tag filters before deploying: `PT_tag_filter=<tag> ./tasks/tofu_inventory.sh`
+- **Test** tag filters before deploying: `PT_provider=proxmox PT_tag_filter=<tag> ./tasks/tofu_inventory.sh`
 - **Extend** via tags, not by modifying inventory task
 - Terraform and Bolt are **decoupled** - run independently
-- **Control repo** is created on demand - not checked into proxtoboltfu
+- **Control repo** is created on demand - not checked into igor
 - **r10k_remote** is the single source of truth for control repo location
 - **Bootstrap** before first agent run, **destroy** when tearing down
+- **Bootstrap** is idempotent - safe to run multiple times
 - **Token generation** works with both repos - detects which one to update
+- **Preflight** validates all prerequisites before deployment
 
 ## Task Management
 
-This project uses **OmniFocus** for task tracking via the MCP OmniFocus integration. Tasks are stored in the **proxtoboltfu** project within the "Puppet Tech Stuff" folder.
+This project uses **OmniFocus** for task tracking via the MCP OmniFocus integration. Tasks are stored in the **igor** project within the "Puppet Tech Stuff" folder.
 
 **Task Tags:**
 - `<Code>` - Code implementation tasks

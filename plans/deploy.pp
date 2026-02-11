@@ -1,17 +1,24 @@
 # @summary Orchestrate full environment build
 # @param apply_terraform Whether to run tofu apply first (default: true)
-plan proxtoboltfu::build_environment (
-  Boolean $apply_terraform = true
+# @param provider Infrastructure provider (default: proxmox)
+plan igor::deploy (
+  Boolean $apply_terraform = true,
+  String $provider = 'proxmox'
 ) {
 
-  out::message("=== proxtoboltfu Environment Build ===")
+  out::message("=== Igor Environment Build ===")
+  out::message("")
+
+  # Step 0: Preflight checks
+  out::message("Step 0: Running preflight checks...")
+  run_plan('igor::preflight', 'provider' => $provider)
   out::message("")
 
   # Step 1: Apply OpenTofu to provision infrastructure
   if $apply_terraform {
     out::message("Step 1: Provisioning infrastructure with OpenTofu...")
     $tofu_result = run_command(
-      'cd tf && tofu apply -auto-approve -parallelism=1',
+      "cd tf/providers/${provider} && tofu apply -auto-approve -parallelism=1",
       'localhost',
       '_run_as' => system::env('USER'),
       '_catch_errors' => true
@@ -32,20 +39,24 @@ plan proxtoboltfu::build_environment (
 
   # Step 2: Build Puppet Enterprise
   out::message("Step 2: Building Puppet Enterprise...")
-  run_plan('proxtoboltfu::build_pe')
+  run_plan('igor::build_pe')
   out::message("✓ Puppet Enterprise build complete (includes CA cert and console login)")
+
+  out::message("  Configuring Puppet client tools...")
+  run_plan('igor::configure_client_tools')
+  out::message("✓ Puppet client tools configured")
   out::message("")
 
   # Step 2.5: Generate Nessus PE token (if Nessus will be deployed)
-  $nessus_check = run_task('proxtoboltfu::tofu_inventory', 'localhost',
-    'dir' => 'tf',
+  $nessus_check = run_task('igor::tofu_inventory', 'localhost',
+    'provider' => $provider,
     'tag_filter' => 'nessus'
   )
   $nessus_check_data = $nessus_check.first.value['value']
 
   if !$nessus_check_data.empty {
     out::message("Step 2.5: Generating Nessus PE token...")
-    run_plan('proxtoboltfu::generate_nessus_pe_token', 'regenerate' => true, 'commit_changes' => true)
+    run_plan('igor::generate_nessus_pe_token', 'regenerate' => true, 'commit_changes' => true)
     out::message("✓ Nessus PE token generated and committed")
 
     out::message("  Deploying production code to PE...")
@@ -68,20 +79,20 @@ plan proxtoboltfu::build_environment (
   out::message("Step 3: Building additional infrastructure servers...")
 
   # Get fresh inventory from tofu state (inventory is cached from plan start)
-  $scm_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
-    'dir' => 'tf',
+  $scm_inventory = run_task('igor::tofu_inventory', 'localhost',
+    'provider' => $provider,
     'tag_filter' => 'scm'
   )
-  $cd4pe_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
-    'dir' => 'tf',
+  $cd4pe_inventory = run_task('igor::tofu_inventory', 'localhost',
+    'provider' => $provider,
     'tag_filter' => 'cd4pe'
   )
-  $dashboard_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
-    'dir' => 'tf',
+  $dashboard_inventory = run_task('igor::tofu_inventory', 'localhost',
+    'provider' => $provider,
     'tag_filter' => 'dashboard'
   )
-  $nessus_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
-    'dir' => 'tf',
+  $nessus_inventory = run_task('igor::tofu_inventory', 'localhost',
+    'provider' => $provider,
     'tag_filter' => 'nessus'
   )
 
@@ -103,7 +114,7 @@ plan proxtoboltfu::build_environment (
     $scm_job = background() || {
       if !$scm_targets.empty {
         out::message("  Building SCM server...")
-        run_plan('proxtoboltfu::build_scm')
+        run_plan('igor::build_scm')
         out::message("  ✓ SCM build complete")
       }
     }
@@ -111,7 +122,7 @@ plan proxtoboltfu::build_environment (
     $cd4pe_job = background() || {
       if !$cd4pe_targets.empty {
         out::message("  Building CD4PE server...")
-        run_plan('proxtoboltfu::build_cd4pe')
+        run_plan('igor::build_cd4pe')
         out::message("  ✓ CD4PE build complete")
       }
     }
@@ -119,7 +130,7 @@ plan proxtoboltfu::build_environment (
     $dashboard_job = background() || {
       if !$dashboard_targets.empty {
         out::message("  Building Dashboard server...")
-        run_plan('proxtoboltfu::build_dashboard')
+        run_plan('igor::build_dashboard')
         out::message("  ✓ Dashboard build complete")
       }
     }
@@ -127,7 +138,7 @@ plan proxtoboltfu::build_environment (
     $nessus_job = background() || {
       if !$nessus_targets.empty {
         out::message("  Building Nessus server...")
-        run_plan('proxtoboltfu::build_nessus')
+        run_plan('igor::build_nessus')
         out::message("  ✓ Nessus build complete")
       }
     }
@@ -143,8 +154,8 @@ plan proxtoboltfu::build_environment (
   out::message("Step 4: Building agent nodes...")
 
   # Get fresh inventory from tofu state
-  $agent_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
-    'dir' => 'tf',
+  $agent_inventory = run_task('igor::tofu_inventory', 'localhost',
+    'provider' => $provider,
     'tag_filter' => 'puppetagents'
   )
 
@@ -155,7 +166,7 @@ plan proxtoboltfu::build_environment (
     out::message("⚠ No agent nodes found in tofu state, skipping")
   } else {
     out::message("Found ${agent_targets.length} agent node(s), building...")
-    run_plan('proxtoboltfu::build_agents')
+    run_plan('igor::build_agents')
     out::message("✓ Agent build complete")
   }
 
@@ -164,7 +175,8 @@ plan proxtoboltfu::build_environment (
   out::message("")
   out::message("Summary:")
   out::message("  ✓ Infrastructure provisioned")
-  out::message("  ✓ Puppet Enterprise installed and configured (with CA cert and console access)")
+  out::message("  ✓ Puppet Enterprise installed and configured")
+  out::message("  ✓ Puppet client tools configured (CA cert imported, console access enabled)")
   if !$scm_targets.empty or !$cd4pe_targets.empty or !$dashboard_targets.empty or !$nessus_targets.empty {
     out::message("  ✓ Additional infrastructure servers configured")
   }
@@ -172,12 +184,12 @@ plan proxtoboltfu::build_environment (
     out::message("  ✓ ${agent_targets.length} agent nodes built")
   }
 
-  return {
+  return({
     status => 'completed',
     scm_count => $scm_targets.length,
     cd4pe_count => $cd4pe_targets.length,
     dashboard_count => $dashboard_targets.length,
     nessus_count => $nessus_targets.length,
     agent_count => $agent_targets.length
-  }
+  })
 }

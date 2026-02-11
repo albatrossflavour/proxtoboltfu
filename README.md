@@ -1,4 +1,8 @@
-# proxtoboltfu
+<p align="center">
+  <img src="graphics/igor_logo_512.png" alt="Igor">
+</p>
+
+# igor
 
 ## Puppet Infrastructure Automation
 
@@ -74,8 +78,8 @@ for VMs.
 ### 1. Clone and Configure Repository
 
 ```bash
-git clone <repository-url> proxtoboltfu
-cd proxtoboltfu
+git clone <repository-url> igor
+cd igor
 ```
 
 ### 2. Generate Eyaml Keys
@@ -96,7 +100,7 @@ Never commit it to version control.
 
 ### 3. Configure Terraform Variables
 
-Create `tf/terraform.tfvars` with your environment-specific values:
+Create `tf/providers/proxmox/terraform.tfvars` with your environment-specific values:
 
 ```hcl
 # Proxmox Configuration
@@ -149,7 +153,7 @@ memory = 1536
 Add to `.gitignore`:
 
 ```bash
-echo "tf/terraform.tfvars" >> .gitignore
+echo "tf/providers/*/terraform.tfvars" >> .gitignore
 ```
 
 ### 4. Configure Hiera Data
@@ -223,7 +227,7 @@ config:
 Review `bolt-project.yaml` and update module dependencies if needed:
 
 ```yaml
-name: proxtoboltfu
+name: igor # Bolt project name
 modules:
   - name: puppetlabs-peadm
   - name: puppetlabs-cd4peadm
@@ -240,7 +244,7 @@ bolt module install
 ### Full Stack Deployment (Single Command)
 
 ```bash
-bolt plan run proxtoboltfu::build_environment
+bolt plan run igor::deploy
 ```
 
 This orchestrates the complete deployment:
@@ -256,7 +260,7 @@ This orchestrates the complete deployment:
 To skip infrastructure provisioning (if VMs already exist):
 
 ```bash
-bolt plan run proxtoboltfu::build_environment \
+bolt plan run igor::deploy \
   apply_terraform=false
 ```
 
@@ -267,11 +271,11 @@ If you prefer manual control:
 #### 1. Provision Infrastructure
 
 ```bash
-cd tf
+cd tf/providers/proxmox
 tofu init
 tofu plan   # Review what will be created
 tofu apply -parallelism=1
-cd ..
+cd ../../..
 ```
 
 This creates VMs and DNS records for enabled infrastructure.
@@ -282,7 +286,7 @@ Serial execution (`-parallelism=1`) prevents Pihole API exhaustion.
 #### 2. Build Puppet Enterprise
 
 ```bash
-bolt plan run proxtoboltfu::build_pe
+bolt plan run igor::build_pe
 ```
 
 This installs and configures PE, deploys code, and installs
@@ -295,10 +299,10 @@ eyaml keys.
 These can run in parallel:
 
 ```bash
-bolt plan run proxtoboltfu::build_scm
-bolt plan run proxtoboltfu::build_cd4pe
-bolt plan run proxtoboltfu::build_dashboard
-bolt plan run proxtoboltfu::build_nessus
+bolt plan run igor::build_scm
+bolt plan run igor::build_cd4pe
+bolt plan run igor::build_dashboard
+bolt plan run igor::build_nessus
 ```
 
 **Expected time:** 15-20 minutes each
@@ -306,7 +310,7 @@ bolt plan run proxtoboltfu::build_nessus
 #### 4. Build Agent Nodes
 
 ```bash
-bolt plan run proxtoboltfu::build_agents
+bolt plan run igor::build_agents
 ```
 
 **Expected time:** Varies by agent count
@@ -316,18 +320,18 @@ bolt plan run proxtoboltfu::build_agents
 
 **Deploy Clients:**
 
-1. Configure client counts in `tf/terraform.tfvars`
-2. Apply infrastructure: `cd tf && tofu apply -parallelism=1 && cd ..`
-3. Configure agents: `bolt plan run proxtoboltfu::build_agents`
+1. Configure client counts in `tf/providers/proxmox/terraform.tfvars`
+2. Apply infrastructure: `cd tf/providers/proxmox && tofu apply -parallelism=1 && cd ../../..`
+3. Configure agents: `bolt plan run igor::build_agents`
 
 **Destroy Clients:**
 
 ```bash
 # Preview what will be destroyed
-bolt plan run proxtoboltfu::destroy_clients
+bolt plan run igor::destroy_agents
 
 # Actually destroy (purges from PE, then destroys VMs)
-bolt plan run proxtoboltfu::destroy_clients confirm=true
+bolt plan run igor::destroy_agents confirm=true
 ```
 
 The destroy process automatically purges agent certificates from
@@ -450,10 +454,10 @@ create inventory groups in `inventory.yaml`.
 
 ### Add Agent Nodes
 
-Agent nodes are managed via `tf/clients.tf` which uses dynamic
+Agent nodes are managed via `tf/providers/proxmox/clients.tf` which uses dynamic
 configuration:
 
-1. **Enable OS distributions** in `tf/terraform.tfvars`:
+1. **Enable OS distributions** in `tf/providers/proxmox/terraform.tfvars`:
 
    ```hcl
    enable_ubuntu = true
@@ -465,13 +469,13 @@ configuration:
 2. **Apply Terraform:**
 
    ```bash
-   cd tf && tofu apply -parallelism=1
+   cd tf/providers/proxmox && tofu apply -parallelism=1
    ```
 
 3. **Deploy agents:**
 
    ```bash
-   bolt plan run proxtoboltfu::build_agents
+   bolt plan run igor::build_agents
    ```
 
 This creates agents for each enabled OS version in both
@@ -488,10 +492,10 @@ environments. For example, with the above config:
 
 ```bash
 # Preview what will be destroyed
-bolt plan run proxtoboltfu::destroy_clients
+bolt plan run igor::destroy_agents
 
 # Confirm and destroy
-bolt plan run proxtoboltfu::destroy_clients confirm=true
+bolt plan run igor::destroy_agents confirm=true
 ```
 
 This automatically purges certificates from PE before destroying VMs.
@@ -501,7 +505,7 @@ This automatically purges certificates from PE before destroying VMs.
 **Warning:** This destroys all VMs and data.
 
 ```bash
-cd tf
+cd tf/providers/proxmox
 tofu destroy
 ```
 
@@ -512,7 +516,7 @@ Review the plan carefully before confirming.
 Modify Terraform files, then:
 
 ```bash
-cd tf
+cd tf/providers/proxmox
 tofu plan   # Review changes
 tofu apply -parallelism=1
 ```
@@ -520,7 +524,7 @@ tofu apply -parallelism=1
 Re-run Bolt plans if configuration changed:
 
 ```bash
-bolt plan run proxtoboltfu::build_pe
+bolt plan run igor::build_pe
 ```
 
 ### Troubleshooting
@@ -529,10 +533,10 @@ bolt plan run proxtoboltfu::build_pe
 
 ```bash
 # Test inventory task directly
-PT_dir=tf ./tasks/tofu_inventory.sh
+PT_provider=proxmox ./tasks/tofu_inventory.sh
 
 # Check specific tag filter
-PT_dir=tf PT_tag_filter=puppet \
+PT_provider=proxmox PT_tag_filter=puppet \
   ./tasks/tofu_inventory.sh
 ```
 
@@ -586,7 +590,7 @@ sudo sed -i 's/wrong.domain.com/albatrossflavour.com/g' \
 sudo netplan apply
 
 # Or recreate the VM with updated Terraform config
-tofu -chdir=tf apply -parallelism=1 \
+tofu -chdir=tf/providers/proxmox apply -parallelism=1 \
   -replace=proxmox_vm_qemu.server-name[0]
 ```
 
@@ -607,7 +611,7 @@ documentation, including:
 
 **Never commit:**
 
-- `tf/terraform.tfvars` (contains secrets)
+- `tf/providers/proxmox/terraform.tfvars` (contains secrets)
 - `keys/private_key.pkcs7.pem` (eyaml private key)
 - Any files with unencrypted passwords
 
@@ -622,7 +626,7 @@ documentation, including:
 
 ```bash
 chmod 600 keys/private_key.pkcs7.pem
-chmod 600 tf/terraform.tfvars
+chmod 600 tf/providers/proxmox/terraform.tfvars
 ```
 
 ### Network Security

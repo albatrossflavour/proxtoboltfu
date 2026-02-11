@@ -1,13 +1,12 @@
 # Terraboltmox Unified .gitignore
 
 ## Terraform
-tf/terraform-plugin-proxmox.log
-tf/.terraform
-tf/.terraform.lock.hcl
-tf/terraform.tfstate.backup
-tf/terraform.tfstate
-tf/terraform.tfvars
-tf/s3.tfbackend
+tf/providers/*/terraform-plugin-proxmox.log
+tf/providers/*/.terraform
+tf/providers/*/.terraform.lock.hcl
+tf/providers/*/terraform.tfstate*
+tf/providers/*/terraform.tfvars
+tf/providers/*/s3.tfbackend
 
 ## Configuration (keep sensitive configs private)
 config/params.json

@@ -1,4 +1,4 @@
-plan proxtoboltfu::status() {
+plan igor::status() {
   out::message('=== Puppet Infrastructure Status ===')
   out::message('')
 
@@ -7,7 +7,7 @@ plan proxtoboltfu::status() {
 
   if $infra_targets.empty {
     out::message('No infrastructure found in Terraform state.')
-    return {}
+    return({})
   }
 
   # Get agent targets
@@ -178,12 +178,12 @@ plan proxtoboltfu::status() {
 
   out::message('')
 
-  return {
+  return({
     infrastructure => $infra_status,
     agents         => {
       total  => $agent_count,
       by_os  => $os_counts,
       by_env => $env_counts,
     }
-  }
+  })
 }

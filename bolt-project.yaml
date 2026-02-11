@@ -1,4 +1,4 @@
-name: proxtoboltfu
+name: igor
 modules:
   # PEAdm modules
   - name: puppetlabs-peadm

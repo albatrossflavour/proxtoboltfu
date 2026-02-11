@@ -1,5 +1,5 @@
 # @summary Install and configure CD4PE server
-plan proxtoboltfu::build_cd4pe {
+plan igor::build_cd4pe {
 
   # Lookup config from hiera
   $config = lookup('cd4peadm::config', Hash, first, undef)
@@ -30,7 +30,7 @@ plan proxtoboltfu::build_cd4pe {
 
   if $check_puppet.ok {
     out::message("✓ Puppet already installed on ${targets}, skipping installation")
-    return { status => 'already_installed' }
+    return({ status => 'already_installed' })
   }
 
   out::message("Puppet not found, proceeding with installation...")
@@ -76,5 +76,5 @@ plan proxtoboltfu::build_cd4pe {
 
   out::message("CD4PE build completed successfully")
 
-  return { status => 'completed' }
+  return({ status => 'completed' })
 }

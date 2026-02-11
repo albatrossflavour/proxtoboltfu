@@ -1,9 +1,10 @@
 {
   "description": "Get VMs from OpenTofu/Terraform state for inventory",
   "parameters": {
-    "dir": {
-      "description": "Path to Terraform/OpenTofu project directory",
-      "type": "Optional[String]"
+    "provider": {
+      "description": "Provider name (maps to tf/providers/<provider>/)",
+      "type": "Optional[String]",
+      "default": "proxmox"
     },
     "tag_filter": {
       "description": "Filter by tag (e.g., 'puppetinfra', 'puppet', 'scm', 'cd4pe', 'puppetagents')",

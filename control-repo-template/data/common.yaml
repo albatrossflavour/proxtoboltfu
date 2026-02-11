@@ -1,3 +1,3 @@
 # Common configuration for all nodes
 # This file will be populated by bootstrap_control_repo plan
-# with actual data from proxtoboltfu/data/common.yaml
+# with actual data from igor/data/common.yaml

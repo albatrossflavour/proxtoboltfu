@@ -1,5 +1,5 @@
 # @summary Login to Puppet Enterprise console
-plan proxtoboltfu::puppet_access_login {
+plan igor::puppet_access_login {
 
   out::message("Logging in to Puppet Enterprise console")
 
@@ -19,5 +19,5 @@ plan proxtoboltfu::puppet_access_login {
   out::message("Logged in to Puppet Enterprise console")
   out::message("Token saved to ${token_file}")
 
-  return { status => 'completed' }
+  return({ status => 'completed' })
 }

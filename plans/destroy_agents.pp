@@ -1,15 +1,17 @@
 # @summary Destroy puppet agent clients using OpenTofu
 # @param confirm Safety confirmation (must be true to proceed with destroy)
-plan proxtoboltfu::destroy_clients (
-  Boolean $confirm = false
+# @param provider Infrastructure provider (default: proxmox)
+plan igor::destroy_agents (
+  Boolean $confirm = false,
+  String $provider = 'proxmox'
 ) {
 
   out::message('=== Puppet Agent Clients Destroy Plan ===')
   out::message('')
 
   # Get current agent inventory to show what will be destroyed
-  $agent_inventory = run_task('proxtoboltfu::tofu_inventory', 'localhost',
-    'dir' => 'tf',
+  $agent_inventory = run_task('igor::tofu_inventory', 'localhost',
+    'provider' => $provider,
     'tag_filter' => 'puppetagents'
   )
 
@@ -18,7 +20,7 @@ plan proxtoboltfu::destroy_clients (
 
   if $agent_count == 0 {
     out::message('⚠ No agent nodes found in tofu state')
-    return { status => 'no_agents', agent_count => 0 }
+    return({ status => 'no_agents', agent_count => 0 })
   }
 
   out::message("Found ${agent_count} agent node(s) to destroy:")
@@ -30,17 +32,42 @@ plan proxtoboltfu::destroy_clients (
   # Check if we should proceed with destroy
   unless $confirm {
     out::message('To proceed with destroy, run:')
-    out::message('  bolt plan run proxtoboltfu::destroy_clients confirm=true')
-    return {
+    out::message('  bolt plan run igor::destroy_agents confirm=true')
+    return({
       status => 'plan_only',
       agent_count => $agent_count
-    }
+    })
   }
 
-  # Destroy using OpenTofu with target flag for puppet_clients resource
+  # Get dynamic resource addresses from tofu output
+  $provider_dir = "tf/providers/${provider}"
+  $addresses_result = run_command(
+    "cd ${provider_dir} && tofu output -json client_resource_addresses",
+    'localhost',
+    '_run_as' => system::env('USER'),
+    '_catch_errors' => true
+  )
+
+  unless $addresses_result.ok {
+    fail_plan("Failed to get client resource addresses: ${addresses_result.first.error}")
+  }
+
+  $addresses_json = $addresses_result.first.value['stdout'].strip
+
+  # Build -target flags from the output
+  $target_flags_result = run_command(
+    "echo '${addresses_json}' | jq -r '(.compute + .dns)[] | \"-target=\" + .' | tr '\\n' ' '",
+    'localhost',
+    '_run_as' => system::env('USER'),
+    '_catch_errors' => true
+  )
+
+  $target_flags = $target_flags_result.first.value['stdout'].strip
+
+  # Destroy using OpenTofu with dynamic target flags
   out::message('Running tofu destroy for puppet_clients...')
   $destroy_result = run_command(
-    'cd tf && tofu destroy -target=proxmox_vm_qemu.puppet_clients -target=pihole_dns_record.puppet_clients -auto-approve',
+    "cd ${provider_dir} && tofu destroy ${target_flags} -auto-approve",
     'localhost',
     '_run_as' => system::env('USER'),
     '_catch_errors' => true
@@ -54,8 +81,8 @@ plan proxtoboltfu::destroy_clients (
     fail_plan("Failed to destroy clients: ${destroy_result.first.error}")
   }
 
-  return {
+  return({
     status => 'destroyed',
     agent_count => $agent_count
-  }
+  })
 }

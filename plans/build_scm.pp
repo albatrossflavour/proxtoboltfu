@@ -1,5 +1,5 @@
 # @summary Install and configure SCM server
-plan proxtoboltfu::build_scm {
+plan igor::build_scm {
 
   # Lookup config from hiera
   $config = lookup('complyadm::config', Hash, first, undef)
@@ -30,7 +30,7 @@ plan proxtoboltfu::build_scm {
 
   if $check_puppet.ok {
     out::message("✓ Puppet already installed on ${targets}, skipping installation")
-    return { status => 'already_installed' }
+    return({ status => 'already_installed' })
   }
 
   out::message("Puppet not found, proceeding with installation...")
@@ -76,5 +76,5 @@ plan proxtoboltfu::build_scm {
 
   out::message("SCM build completed successfully")
 
-  return { status => 'completed' }
+  return({ status => 'completed' })
 }

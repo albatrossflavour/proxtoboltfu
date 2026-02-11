@@ -1,5 +1,5 @@
 # @summary Download CA certificate from new PE server
-plan proxtoboltfu::fetch_ca_cert {
+plan igor::fetch_ca_cert {
 
   # Lookup PE config from hiera
   $peadm_config = lookup('peadm::config', Hash, first, undef)
@@ -18,5 +18,5 @@ plan proxtoboltfu::fetch_ca_cert {
 
   out::message("CA certificate downloaded successfully to ~/.puppetlabs/etc/puppet/ssl/${pe_server}.pem")
 
-  return { status => 'completed' }
+  return({ status => 'completed' })
 }
